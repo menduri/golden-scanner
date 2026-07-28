@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Golden Scanner</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+:root {
+  --bg: #07090d;
+  --surf: #0d1117;
+  --surf2: #141a22;
+  --surf3: #1a2230;
+  --border: #1e2d3d;
+  --gold: #f0a500;
+  --gold2: #ffc94d;
+  --gold-glow: rgba(240,165,0,0.15);
+  --green: #00cc66;
+  --red: #ff4455;
+  --blue: #4499ff;
+  --purple: #bb77ff;
+  --orange: #ff8c00;
+  --cyan: #66ccff;
+  --text: #e8f0fe;
+  --muted: #4a6080;
+  --muted2: #7a9ab8;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html { font-size: 16px; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── HEADER ── */
+.header {
+  background: linear-gradient(180deg, #0d1117 0%, transparent 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(20px);
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo-mark {
+  width: 36px; height: 36px;
+  background: var(--gold);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.logo-text {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+}
+.logo-text span { color: var(--gold); }
+.logo-sub {
+  font-size: 10px;
+  color: var(--muted2);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  font-family: 'Space Mono', monospace;
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.scan-btn {
+  background: var(--gold);
+  color: #000;
+  border: none;
+  padding: 12px 24px;
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.scan-btn:hover:not(:disabled) {
+  background: var(--gold2);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(240,165,0,0.35);
+}
+.scan-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.manage-btn {
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  color: var(--muted2);
+  padding: 11px 16px;
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.manage-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+/* ── STATS BAR ── */
+.stats-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: var(--surf);
+}
+.stats-bar::-webkit-scrollbar { display: none; }
+.stat-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 16px;
+  border-right: 1px solid var(--border);
+  min-width: 80px;
+  flex-shrink: 0;
+}
+.stat-chip-label {
+  font-size: 9px;
+  color: var(--muted2);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-family: 'Space Mono', monospace;
+  margin-bottom: 3px;
+}
+.stat-chip-val {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: 'Space Mono', monospace;
+  line-height: 1;
+}
+.sv-gold { color: var(--gold); }
+.sv-green { color: var(--green); }
+.sv-yellow { color: #ffd700; }
+.sv-cyan { color: var(--cyan); }
+.sv-purple { color: var(--purple); }
+.sv-orange { color: var(--orange); }
+.sv-red { color: var(--red); }
+.sv-muted { color: var(--muted2); }
+
+/* ── FILTERS ── */
+.filters {
+  display: flex;
+  gap: 6px;
+  padding: 12px 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--border);
+  background: var(--surf);
+}
+.filters::-webkit-scrollbar { display: none; }
+.fbtn {
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  color: var(--muted2);
+  padding: 6px 14px;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.fbtn:hover { border-color: var(--gold); color: var(--gold); }
+.fbtn.active { background: var(--gold-glow); border-color: var(--gold); color: var(--gold); }
+.fbtn.f-gold.active { background: rgba(240,165,0,0.12); border-color: var(--gold); color: var(--gold); }
+.fbtn.f-green.active { background: rgba(0,204,102,0.1); border-color: var(--green); color: var(--green); }
+.fbtn.f-yellow.active { background: rgba(255,215,0,0.1); border-color: #ffd700; color: #ffd700; }
+.fbtn.f-blue.active { background: rgba(102,204,255,0.1); border-color: var(--cyan); color: var(--cyan); }
+.fbtn.f-purple.active { background: rgba(187,119,255,0.1); border-color: var(--purple); color: var(--purple); }
+.fbtn.f-orange.active { background: rgba(255,140,0,0.1); border-color: var(--orange); color: var(--orange); }
+.fbtn.f-red.active { background: rgba(255,68,85,0.1); border-color: var(--red); color: var(--red); }
+
+/* ── LOADING ── */
+.loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  gap: 20px;
+  text-align: center;
+}
+.loading-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--gold);
+  font-family: 'Space Mono', monospace;
+}
+.progress-track {
+  width: min(360px, 85vw);
+  height: 4px;
+  background: var(--surf2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold), var(--gold2));
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+.loading-sub {
+  font-size: 11px;
+  color: var(--muted2);
+  font-family: 'Space Mono', monospace;
+  line-height: 1.8;
+}
+.loading-ticker {
+  font-size: 13px;
+  color: var(--gold);
+  font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  min-height: 20px;
+}
+
+/* ── START SCREEN ── */
+.start-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  gap: 18px;
+  text-align: center;
+}
+.start-icon { font-size: 56px; }
+.start-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: -0.5px;
+}
+.start-sub {
+  font-size: 13px;
+  color: var(--muted2);
+  line-height: 1.8;
+  max-width: 340px;
+  font-family: 'Space Mono', monospace;
+}
+
+/* ── CARDS GRID ── */
+.cards-grid {
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 10px;
+}
+@media (max-width: 480px) {
+  .cards-grid { grid-template-columns: 1fr; padding: 10px; gap: 8px; }
+}
+
+/* ── SECTION HEADER ── */
+.section-hdr {
+  grid-column: 1/-1;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--muted2);
+  padding: 12px 4px 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+
+/* ── CARD ── */
+.card {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  transition: all 0.18s;
+  position: relative;
+  overflow: hidden;
+}
+.card:hover { transform: translateY(-2px); border-color: #2a3a4a; }
+.card:active { transform: translateY(0); }
+
+.card.c-gold { border-left: 3px solid var(--gold); box-shadow: 0 0 30px rgba(240,165,0,0.08); }
+.card.c-green { border-left: 3px solid var(--green); }
+.card.c-yellow { border-left: 3px solid #ffd700; }
+.card.c-blue { border-left: 3px solid var(--cyan); }
+.card.c-purple { border-left: 3px solid var(--purple); }
+.card.c-orange { border-left: 3px solid var(--orange); }
+.card.c-red { border-left: 3px solid var(--red); }
+
+.gold-badge {
+  position: absolute;
+  top: 10px; right: 10px;
+  background: var(--gold);
+  color: #000;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-family: 'Space Mono', monospace;
+  letter-spacing: 0.5px;
+}
+
+.card-top {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.card-sym {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  font-family: 'Space Mono', monospace;
+}
+.card-price { font-size: 13px; color: var(--text); font-weight: 500; }
+.card-stage-pill {
+  margin-left: auto;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  font-family: 'Space Mono', monospace;
+}
+.pill-gold { background: rgba(240,165,0,0.15); color: var(--gold); }
+.pill-green { background: rgba(0,204,102,0.1); color: var(--green); }
+.pill-yellow { background: rgba(255,215,0,0.1); color: #ffd700; }
+.pill-blue { background: rgba(102,204,255,0.1); color: var(--cyan); }
+.pill-purple { background: rgba(187,119,255,0.1); color: var(--purple); }
+.pill-orange { background: rgba(255,140,0,0.1); color: var(--orange); }
+.pill-red { background: rgba(255,68,85,0.1); color: var(--red); }
+
+.card-inds {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.ind {
+  background: var(--surf2);
+  border-radius: 6px;
+  padding: 7px 10px;
+}
+.ind-label {
+  font-size: 8px;
+  color: var(--muted2);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 3px;
+  font-family: 'Space Mono', monospace;
+}
+.ind-val {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: 'Space Mono', monospace;
+  line-height: 1;
+}
+.ind-sub { font-size: 9px; color: var(--muted2); margin-top: 1px; font-family: 'Space Mono', monospace; }
+
+.tsi-extreme { color: #ff6b6b; }
+.tsi-buy { color: var(--green); }
+.tsi-zero { color: var(--cyan); }
+.tsi-prof { color: var(--orange); }
+.tsi-hprof { color: var(--red); }
+.tsi-neutral { color: var(--muted2); }
+.col-up { color: var(--green); }
+.col-dn { color: var(--red); }
+.col-muted { color: var(--muted2); }
+
+.card-mas {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.ma-chip {
+  font-size: 9px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-family: 'Space Mono', monospace;
+}
+.ma-up { background: rgba(0,204,102,0.1); color: var(--green); }
+.ma-dn { background: rgba(255,68,85,0.08); color: var(--red); }
+
+.weekly-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 5px 10px;
+  background: var(--surf2);
+  border-radius: 6px;
+  font-family: 'Space Mono', monospace;
+}
+.wl { font-size: 9px; color: var(--muted2); text-transform: uppercase; letter-spacing: 0.8px; }
+.wv { font-size: 12px; font-weight: 700; }
+.w-star { color: var(--gold); margin-left: auto; font-size: 9px; }
+
+.card-signal {
+  font-size: 11px;
+  color: var(--muted2);
+  line-height: 1.5;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.card-signal strong { color: var(--text); }
+
+.empty-state {
+  grid-column: 1/-1;
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted2);
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+}
+
+/* ── DOWNLOAD BAR ── */
+.download-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--surf);
+  border-top: 1px solid var(--border);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  backdrop-filter: blur(20px);
+  z-index: 50;
+}
+.dl-info { flex: 1; font-size: 11px; color: var(--muted2); font-family: 'Space Mono', monospace; }
+.dl-info strong { color: var(--gold); }
+.dl-btn {
+  background: var(--green);
+  color: #000;
+  border: none;
+  padding: 10px 20px;
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 8px;
+  cursor: pointer;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+.dl-btn:hover { background: #00ff80; transform: translateY(-1px); }
+
+/* ── WATCHLIST MODAL ── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  z-index: 200;
+  backdrop-filter: blur(8px);
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--gold);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--muted2);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+}
+.modal-sub { font-size: 11px; color: var(--muted2); font-family: 'Space Mono', monospace; line-height: 1.6; }
+.modal-textarea {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  padding: 12px;
+  border-radius: 8px;
+  resize: none;
+  min-height: 200px;
+  outline: none;
+  line-height: 1.8;
+}
+.modal-textarea:focus { border-color: var(--gold); }
+.modal-footer {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.modal-count { font-size: 11px; color: var(--muted2); font-family: 'Space Mono', monospace; flex: 1; }
+.modal-save {
+  background: var(--gold);
+  color: #000;
+  border: none;
+  padding: 10px 20px;
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 8px;
+  cursor: pointer;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.modal-save:hover { background: var(--gold2); }
+
+.saved-toast {
+  display: none;
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--green);
+  color: #000;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  z-index: 300;
+}
+
+/* bottom padding for download bar */
+.cards-grid { padding-bottom: 80px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-mark">✦</div>
+    <div>
+      <div class="logo-text">GOLDEN <span>SCANNER</span></div>
+      <div class="logo-sub">Gerald Peters · TSI 25/13/8</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="manage-btn" onclick="openModal()">⊕ WATCHLIST</button>
+    <button class="scan-btn" id="scanBtn" onclick="startScan()">▶ RUN SCAN</button>
+  </div>
+</div>
+
+<!-- Stats Bar -->
+<div class="stats-bar" id="statsBar" style="display:none">
+  <div class="stat-chip">
+    <div class="stat-chip-label">Scanned</div>
+    <div class="stat-chip-val sv-muted" id="stTotal">0</div>
+  </div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">🥇 Gold</div>
+    <div class="stat-chip-val sv-gold" id="stGold">0</div>
+  </div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">🟢 Stage 1</div>
+    <div class="stat-chip-val sv-green" id="stGreen">0</div>
+  </div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">🟡 Watch</div>
+    <div class="stat-chip-val sv-yellow" id="stYellow">0</div>
+  </div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">🔵 Cont.</div>
+    <div class="stat-chip-val sv-cyan" id="stBlue">0</div>
+  </div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">🟣 S2 Break</div>
+    <div class="stat-chip-val sv-purple" id="stPurple">0</div>
+  </div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">🟠 Stage 3</div>
+    <div class="stat-chip-val sv-orange" id="stOrange">0</div>
+  </div>
+  <div class="stat-chip">
+    <div class="stat-chip-label">🔴 Stage 4</div>
+    <div class="stat-chip-val sv-red" id="stRed">0</div>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="filters" id="filtersBar" style="display:none">
+  <button class="fbtn active" onclick="setFilter('all',this)">ALL</button>
+  <button class="fbtn f-gold" onclick="setFilter('gold',this)">🥇 GOLD</button>
+  <button class="fbtn f-green" onclick="setFilter('stage-1-green',this)">🟢 STAGE 1</button>
+  <button class="fbtn f-yellow" onclick="setFilter('stage-1-yellow',this)">🟡 WATCH</button>
+  <button class="fbtn f-blue" onclick="setFilter('stage-1-blue',this)">🔵 CONTINUATION</button>
+  <button class="fbtn f-purple" onclick="setFilter('stage-2b',this)">🟣 S2 BREAKOUT</button>
+  <button class="fbtn f-orange" onclick="setFilter('stage-3',this)">🟠 STAGE 3</button>
+  <button class="fbtn f-red" onclick="setFilter('stage-4',this)">🔴 STAGE 4</button>
+  <button class="fbtn" onclick="setFilter('buy',this)">✓ BUY ZONE</button>
+</div>
+
+<!-- Main Content -->
+<div id="mainContent">
+  <div class="start-screen">
+    <div class="start-icon">✦</div>
+    <div class="start-title">GOLDEN SCANNER</div>
+    <div class="start-sub">
+      Gerald Peters Stage System<br>
+      TSI 25/13/8 · Daily + Weekly<br>
+      Yahoo Finance Live Data<br><br>
+      Tap <strong style="color:var(--gold)">RUN SCAN</strong> to analyze your watchlist
+    </div>
+  </div>
+</div>
+
+<!-- Download Bar -->
+<div class="download-bar" id="downloadBar" style="display:none">
+  <div class="dl-info">
+    <strong id="dlDate"></strong> · <span id="dlCount"></span>
+  </div>
+  <button class="dl-btn" onclick="downloadExcel()">↓ DOWNLOAD EXCEL</button>
+</div>
+
+<!-- Watchlist Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-title">
+      ⊕ MANAGE WATCHLIST
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-sub">
+      One ticker per line or comma separated.<br>
+      Changes are saved automatically for next scan.
+    </div>
+    <textarea class="modal-textarea" id="watchlistInput" oninput="updateCount()" placeholder="AAPL&#10;NVDA&#10;TSLA..."></textarea>
+    <div class="modal-footer">
+      <div class="modal-count" id="modalCount">0 tickers</div>
+      <button class="modal-save" onclick="saveWatchlist()">SAVE</button>
+    </div>
+  </div>
+</div>
+
+<div class="saved-toast" id="savedToast">✓ Watchlist saved!</div>
+
+<script>
+let allResults = [];
+let currentFilter = 'all';
+let scanInterval = null;
+let currentWatchlist = [];
+
+const STAGE_COLORS = {
+  'gold':'c-gold','stage-1-green':'c-green','stage-1-yellow':'c-yellow',
+  'stage-1-blue':'c-blue','stage-2b':'c-purple','stage-3':'c-orange',
+  'stage-4':'c-red','stage-2':'c-muted'
+};
+const PILL_COLORS = {
+  'gold':'pill-gold','stage-1-green':'pill-green','stage-1-yellow':'pill-yellow',
+  'stage-1-blue':'pill-blue','stage-2b':'pill-purple','stage-3':'pill-orange',
+  'stage-4':'pill-red'
+};
+const SEC_NAMES = {
+  'gold':'🥇 GOLD SETUPS — Daily + Weekly TSI <-20 — HIGHEST CONVICTION',
+  'stage-1-green':'🟢 STAGE 1 CONFIRMED — TSI <-20 + Candle Above 7 EMA — BUY',
+  'stage-1-yellow':'🟡 WATCHING — TSI <-20, Waiting for Candle Above 7 EMA',
+  'stage-1-blue':'🔵 STAGE 1 CONTINUATION — TSI Below 0 + Candle Above 7 EMA',
+  'stage-2b':'🟣 S2 BREAKOUT — Candle Above 21 EMA — Last Entry',
+  'stage-3':'🟠 STAGE 3 — Distribution — Consider Taking Profits',
+  'stage-4':'🔴 STAGE 4 — Decline — EXIT NOW',
+};
+const ORDER = {'gold':0,'stage-1-green':1,'stage-1-yellow':2,'stage-1-blue':3,'stage-2b':4,'stage-3':5,'stage-4':6,'stage-2':7};
+
+function tsiClass(v) {
+  if(v==null) return 'tsi-neutral';
+  if(v<-40) return 'tsi-extreme'; if(v<-20) return 'tsi-buy';
+  if(v<0) return 'tsi-zero'; if(v>40) return 'tsi-hprof'; if(v>20) return 'tsi-prof';
+  return 'tsi-neutral';
+}
+function tsiZone(v) {
+  if(v==null) return '—';
+  if(v<-40) return '🔥🔥 EXTREME'; if(v<-20) return '🔥 BUY ZONE';
+  if(v>40) return '⚠ HEAVY'; if(v>20) return '⚠ PROFITS';
+  if(v<0) return 'BELOW ZERO'; return 'NEUTRAL';
+}
+
+function renderCard(r) {
+  const cc = STAGE_COLORS[r.sk] || '';
+  const pc = PILL_COLORS[r.sk] || 'pill-green';
+  const tdir_col = r.tsi_dir === '↑' ? 'col-up' : 'col-dn';
+  const wtsi_html = r.wtsi != null ? `
+    <div class="weekly-row">
+      <span class="wl">WEEKLY TSI</span>
+      <span class="wv ${tsiClass(r.wtsi)}">${r.wtsi.toFixed(1)}</span>
+      ${r.wtsi < -20 ? '<span class="w-star">★ WEEKLY ALIGNED</span>' : ''}
+    </div>` : '';
+
+  return `
+  <div class="card ${cc}" data-sk="${r.sk}" data-buy="${r.buy}" data-gold="${r.is_gold}">
+    ${r.is_gold ? '<div class="gold-badge">🔥 GOLD</div>' : ''}
+    <div class="card-top">
+      <span class="card-sym" style="color:${getColor(r.sk)}">${r.sym}</span>
+      <span class="card-price">$${r.price?.toFixed(2) ?? '—'}</span>
+      <span class="card-stage-pill ${pc}">${r.label}</span>
+    </div>
+    <div class="card-inds">
+      <div class="ind">
+        <div class="ind-label">Daily TSI</div>
+        <div class="ind-val ${tsiClass(r.tsi)}">${r.tsi?.toFixed(1) ?? 'N/A'} <span class="${tdir_col}" style="font-size:12px">${r.tsi_dir}</span></div>
+        <div class="ind-sub">${tsiZone(r.tsi)}</div>
+      </div>
+      <div class="ind">
+        <div class="ind-label">Weekly TSI</div>
+        <div class="ind-val ${tsiClass(r.wtsi)}">${r.wtsi?.toFixed(1) ?? '—'}</div>
+        <div class="ind-sub">${r.wtsi != null ? tsiZone(r.wtsi) : '—'}</div>
+      </div>
+    </div>
+    <div class="card-mas">
+      <span class="ma-chip ${r.ab7 ? 'ma-up':'ma-dn'}">${r.ab7 ? '↑':'↓'} 7 EMA</span>
+      <span class="ma-chip ${r.ab21 ? 'ma-up':'ma-dn'}">${r.ab21 ? '↑':'↓'} 21 EMA</span>
+      ${r.ab200 != null ? `<span class="ma-chip ${r.ab200 ? 'ma-up':'ma-dn'}">${r.ab200 ? '↑':'↓'} 200 SMA</span>` : ''}
+    </div>
+    ${wtsi_html}
+    <div class="card-signal"><strong>→</strong> ${r.signal}</div>
+  </div>`;
+}
+
+function getColor(sk) {
+  const map = {'gold':'#f0a500','stage-1-green':'#00cc66','stage-1-yellow':'#ffd700',
+               'stage-1-blue':'#66ccff','stage-2b':'#bb77ff','stage-3':'#ff8c00',
+               'stage-4':'#ff4455','stage-2':'#7a9ab8'};
+  return map[sk] || '#e8f0fe';
+}
+
+function renderResults(filter) {
+  let data = [...allResults];
+  if(filter === 'all') data = data.filter(r => r.sk !== 'stage-2');
+  else if(filter === 'buy') data = data.filter(r => r.buy);
+  else if(filter === 'gold') data = data.filter(r => r.is_gold);
+  else data = data.filter(r => r.sk === filter);
+
+  data.sort((a,b) => {
+    if(a.is_gold !== b.is_gold) return b.is_gold ? 1 : -1;
+    return (ORDER[a.sk]||9) - (ORDER[b.sk]||9) || a.sym.localeCompare(b.sym);
+  });
+
+  let html = '<div class="cards-grid">';
+  if(!data.length) {
+    html += '<div class="empty-state">No stocks match this filter right now.</div>';
+  } else {
+    let lastSk = '';
+    for(const r of data) {
+      const sec = r.is_gold ? '🥇 GOLD SETUPS — Daily + Weekly Stage 1 Aligned' : SEC_NAMES[r.sk] || '';
+      if(sec !== lastSk && (filter === 'all' || filter === 'buy')) {
+        html += `<div class="section-hdr">${sec}</div>`;
+        lastSk = sec;
+      }
+      html += renderCard(r);
+    }
+  }
+  html += '</div>';
+  document.getElementById('mainContent').innerHTML = html;
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if(allResults.length) renderResults(f);
+}
+
+async function startScan() {
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true; btn.textContent = '⏳ SCANNING...';
+  document.getElementById('statsBar').style.display = 'flex';
+  document.getElementById('filtersBar').style.display = 'flex';
+  document.getElementById('downloadBar').style.display = 'none';
+  allResults = [];
+
+  document.getElementById('mainContent').innerHTML = `
+    <div class="loading-screen">
+      <div class="loading-title">SCANNING YOUR WATCHLIST</div>
+      <div class="progress-track"><div class="progress-fill" id="pFill" style="width:0%"></div></div>
+      <div class="loading-sub">TSI 25/13/8 · 7 EMA · 21 EMA · 200 SMA<br>Daily + Weekly · Gerald Peters Stages</div>
+      <div class="loading-ticker" id="lTick">Connecting to Yahoo Finance...</div>
+    </div>`;
+
+  const wlRes = await fetch('/api/watchlist');
+  const wlData = await wlRes.json();
+  currentWatchlist = wlData.tickers;
+
+  await fetch('/api/scan', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({watchlist: currentWatchlist})});
+
+  scanInterval = setInterval(pollProgress, 1200);
+}
+
+async function pollProgress() {
+  const res = await fetch('/api/progress');
+  const data = await res.json();
+
+  const pct = data.total > 0 ? (data.progress / data.total * 100) : 0;
+  const fill = document.getElementById('pFill');
+  const tick = document.getElementById('lTick');
+  if(fill) fill.style.width = pct + '%';
+  if(tick) tick.textContent = data.current ? `Analyzing ${data.current}... (${data.progress}/${data.total})` : 'Starting...';
+
+  document.getElementById('stTotal').textContent = data.scanned;
+  document.getElementById('stGold').textContent = data.counts.gold || 0;
+  document.getElementById('stGreen').textContent = data.counts['stage-1-green'] || 0;
+  document.getElementById('stYellow').textContent = data.counts['stage-1-yellow'] || 0;
+  document.getElementById('stBlue').textContent = data.counts['stage-1-blue'] || 0;
+  document.getElementById('stPurple').textContent = data.counts['stage-2b'] || 0;
+  document.getElementById('stOrange').textContent = data.counts['stage-3'] || 0;
+  document.getElementById('stRed').textContent = data.counts['stage-4'] || 0;
+
+  if(data.done) {
+    clearInterval(scanInterval);
+    const res2 = await fetch('/api/results');
+    const results = await res2.json();
+    allResults = results.results;
+
+    renderResults(currentFilter);
+
+    const btn = document.getElementById('scanBtn');
+    btn.disabled = false; btn.textContent = '↺ RESCAN';
+
+    const dlBar = document.getElementById('downloadBar');
+    dlBar.style.display = 'flex';
+    document.getElementById('dlDate').textContent = results.date;
+    document.getElementById('dlCount').textContent = `${allResults.length} setups found`;
+  }
+}
+
+function downloadExcel() {
+  window.location.href = '/api/download';
+}
+
+// ── WATCHLIST MODAL ──
+async function openModal() {
+  const res = await fetch('/api/watchlist');
+  const data = await res.json();
+  document.getElementById('watchlistInput').value = data.tickers.join('\n');
+  updateCount();
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+function updateCount() {
+  const tickers = document.getElementById('watchlistInput').value
+    .split(/[\n,]+/).map(t=>t.trim().toUpperCase()).filter(Boolean);
+  document.getElementById('modalCount').textContent = tickers.length + ' tickers';
+}
+
+async function saveWatchlist() {
+  const tickers = document.getElementById('watchlistInput').value
+    .split(/[\n,]+/).map(t=>t.trim().toUpperCase()).filter(Boolean);
+  await fetch('/api/watchlist', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({tickers})});
+  document.getElementById('modalCount').textContent = tickers.length + ' tickers saved!';
+  const toast = document.getElementById('savedToast');
+  toast.style.display = 'block';
+  setTimeout(() => { toast.style.display = 'none'; closeModal(); }, 1500);
+}
+
+// Close modal on overlay click
+document.getElementById('modalOverlay').addEventListener('click', function(e) {
+  if(e.target === this) closeModal();
+});
+</script>
+</body>
+</html>
