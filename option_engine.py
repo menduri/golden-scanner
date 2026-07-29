@@ -377,7 +377,7 @@ drawZone(p, col, fc, txt, ls) =>
     linefill.new(tl, bl, fc)
     label.new(bar_index + 8, top, "  " + txt + "  ", color=col, textcolor=color.white, style=label.style_label_left, size=size.normal, yloc=yloc.price)
 
-if barstate.islast
+if barstate.islast and syminfo.ticker == "{sym}"
     // Gamma Flip
     drawZone({a['gf']:.2f}, col_gamma, fill_gamma, "GAMMA FLIP ${a['gf']:.2f} -- {gf_regime} | {score}/10 {label_txt}", line.style_solid)
     // Max Pain
