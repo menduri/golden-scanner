@@ -336,20 +336,23 @@ def generate_pine_single(a):
     leaps_block = ""
     for lv in a["leaps"]:
         leaps_block += f"""
-    line.new(x1=bar_index, y1={lv}, x2=bar_index+1, y2={lv}, color=color.new(color.aqua,40), width=1, extend=extend.both)
-    label.new(bar_index, {lv}, "LEAPS ${lv} -- {pct(lv)}", color=color.new(color.aqua,50), textcolor=color.white, size=size.small, style=label.style_label_right, xloc=xloc.bar_index)"""
+    if syminfo.ticker == "{sym}"
+        line.new(x1=bar_index, y1={lv}, x2=bar_index+1, y2={lv}, color=color.new(color.aqua,40), width=1, extend=extend.both)
+        label.new(bar_index, {lv}, "LEAPS ${lv} -- {pct(lv)}", color=color.new(color.aqua,50), textcolor=color.white, size=size.small, style=label.style_label_right, xloc=xloc.bar_index)"""
 
     resist_block = ""
     for lv in a["resistance"]:
         resist_block += f"""
-    line.new(x1=bar_index, y1={lv}, x2=bar_index+1, y2={lv}, color=color.new(color.orange,40), width=1, extend=extend.both)
-    label.new(bar_index, {lv}, "Resistance ${lv} -- {pct(lv)}", color=color.new(color.orange,50), textcolor=color.white, size=size.small, style=label.style_label_right, xloc=xloc.bar_index)"""
+    if syminfo.ticker == "{sym}"
+        line.new(x1=bar_index, y1={lv}, x2=bar_index+1, y2={lv}, color=color.new(color.orange,40), width=1, extend=extend.both)
+        label.new(bar_index, {lv}, "Resistance ${lv} -- {pct(lv)}", color=color.new(color.orange,50), textcolor=color.white, size=size.small, style=label.style_label_right, xloc=xloc.bar_index)"""
 
     support_block = ""
     for lv in a["support"]:
         support_block += f"""
-    line.new(x1=bar_index, y1={lv}, x2=bar_index+1, y2={lv}, color=color.new(color.red,40), width=2, extend=extend.both)
-    label.new(bar_index, {lv}, "Support ${lv} -- {pct(lv)}", color=color.new(color.red,50), textcolor=color.white, size=size.small, style=label.style_label_right, xloc=xloc.bar_index)"""
+    if syminfo.ticker == "{sym}"
+        line.new(x1=bar_index, y1={lv}, x2=bar_index+1, y2={lv}, color=color.new(color.red,40), width=2, extend=extend.both)
+        label.new(bar_index, {lv}, "Support ${lv} -- {pct(lv)}", color=color.new(color.red,50), textcolor=color.white, size=size.small, style=label.style_label_right, xloc=xloc.bar_index)"""
 
     script = f"""//@version=6
 indicator("{sym} — Option Levels | {a['score']}/10 {a['label']}", overlay=true, max_lines_count=500, max_boxes_count=50, max_labels_count=100)
@@ -358,7 +361,7 @@ indicator("{sym} — Option Levels | {a['score']}/10 {a['label']}", overlay=true
 // Net:{a['net_total_fmt']} | P/C:{a['pc_ratio']} | Score:{a['score']}/10 {a['label']}
 
 var bool drawn = false
-if not drawn
+if not drawn and syminfo.ticker == "{sym}"
     drawn := true
     // Gamma Flip
     box.new(bar_index, {gf_hi}, bar_index+1, {gf_lo}, bgcolor=color.new(color.aqua,82), border_color=color.new(color.aqua,50), extend=extend.both)
