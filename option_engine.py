@@ -321,67 +321,57 @@ def generate_pine_single(a):
         diff = ((level - spot) / spot) * 100
         return f"+{diff:.1f}% above" if diff >= 0 else f"{diff:.1f}% below"
 
-    def fmt(v):
-        if v >= 1e9:  return f"${v/1e9:.1f}B"
-        if v >= 1e6:  return f"${v/1e6:.1f}M"
-        if v >= 1e3:  return f"${v/1e3:.0f}K"
-        return f"${v:.0f}"
-
     gf_hi = round(a["gf"] + zone/2, 4); gf_lo = round(a["gf"] - zone/2, 4)
     mp_hi = round(a["mp"] + zone/2, 4); mp_lo = round(a["mp"] - zone/2, 4)
     cw_hi = round(a["cw"] + zone/2, 4); cw_lo = round(a["cw"] - zone/2, 4)
     pw_hi = round(a["pw"] + zone/2, 4); pw_lo = round(a["pw"] - zone/2, 4)
 
-    # GF label: state gamma regime
     gf_regime = "POS GAMMA" if spot > a["gf"] else "NEG GAMMA"
     gf_lbl = f"GAMMA FLIP ${a['gf']} -- {gf_regime} | {a['score']}/10 {a['label']}"
-    mp_lbl  = f"MAX PAIN ${a['mp']} -- {a['label']} {'+' if a['mp'] > spot else ''}{((a['mp']-spot)/spot*100):.1f}%"
+    mp_sign = "+" if a["mp"] >= spot else ""
+    mp_lbl  = f"MAX PAIN ${a['mp']} -- {mp_sign}{((a['mp']-spot)/spot*100):.1f}%"
     cw_lbl  = f"CALL WALL ${a['cw']} -- {pct(a['cw'])}"
     pw_lbl  = f"PUT WALL ${a['pw']} -- {pct(a['pw'])}"
 
-    # LEAPS lines with labels
     leaps_block = ""
     for lv in a["leaps"]:
-        # Get dollar from chart_data if available
         leaps_block += f"""
-    line.new(bar_index, {lv}, bar_index+500, {lv}, color=color.new(color.aqua,40), width=1, extend=extend.right)
-    label.new(bar_index+10, {lv}, "LEAPS ${lv} -- {pct(lv)}", color=color.new(color.aqua,60), textcolor=color.white, size=size.small, style=label.style_label_left)"""
+    line.new(x1=bar_index, y1={lv}, x2=bar_index+1, y2={lv}, color=color.new(color.aqua,40), width=1, extend=extend.both)
+    label.new(bar_index, {lv}, "LEAPS ${lv} -- {pct(lv)}", color=color.new(color.aqua,50), textcolor=color.white, size=size.small, style=label.style_label_right, xloc=xloc.bar_index)"""
 
-    # Resistance lines with labels
     resist_block = ""
     for lv in a["resistance"]:
         resist_block += f"""
-    line.new(bar_index, {lv}, bar_index+500, {lv}, color=color.new(color.orange,40), width=1, extend=extend.right)
-    label.new(bar_index+10, {lv}, "Resistance ${lv} -- {pct(lv)}", color=color.new(color.orange,60), textcolor=color.white, size=size.small, style=label.style_label_left)"""
+    line.new(x1=bar_index, y1={lv}, x2=bar_index+1, y2={lv}, color=color.new(color.orange,40), width=1, extend=extend.both)
+    label.new(bar_index, {lv}, "Resistance ${lv} -- {pct(lv)}", color=color.new(color.orange,50), textcolor=color.white, size=size.small, style=label.style_label_right, xloc=xloc.bar_index)"""
 
-    # Support lines with labels
     support_block = ""
     for lv in a["support"]:
         support_block += f"""
-    line.new(bar_index, {lv}, bar_index+500, {lv}, color=color.new(color.red,40), width=2, extend=extend.right)
-    label.new(bar_index+10, {lv}, "Support ${lv} -- {pct(lv)}", color=color.new(color.red,60), textcolor=color.white, size=size.small, style=label.style_label_left)"""
+    line.new(x1=bar_index, y1={lv}, x2=bar_index+1, y2={lv}, color=color.new(color.red,40), width=2, extend=extend.both)
+    label.new(bar_index, {lv}, "Support ${lv} -- {pct(lv)}", color=color.new(color.red,50), textcolor=color.white, size=size.small, style=label.style_label_right, xloc=xloc.bar_index)"""
 
     script = f"""//@version=6
 indicator("{sym} — Option Levels | {a['score']}/10 {a['label']}", overlay=true, max_lines_count=500, max_boxes_count=50, max_labels_count=100)
 
 // {sym} | Spot:{spot} | GF:{a['gf']} | MP:{a['mp']} | CW:{a['cw']} | PW:{a['pw']}
-// Net Premium:{a['net_total_fmt']} | P/C:{a['pc_ratio']} | Score:{a['score']}/10 {a['label']}
+// Net:{a['net_total_fmt']} | P/C:{a['pc_ratio']} | Score:{a['score']}/10 {a['label']}
 
 var bool drawn = false
 if not drawn
     drawn := true
-    // ── Gamma Flip ──
-    box.new(bar_index, {gf_hi}, bar_index+500, {gf_lo}, bgcolor=color.new(color.aqua,82), border_color=color.new(color.aqua,50), extend=extend.right)
-    label.new(bar_index+10, {a['gf']}, "{gf_lbl}", color=color.new(color.aqua,60), textcolor=color.white, size=size.small, style=label.style_label_left)
-    // ── Max Pain ──
-    box.new(bar_index, {mp_hi}, bar_index+500, {mp_lo}, bgcolor=color.new(color.yellow,82), border_color=color.new(color.yellow,50), extend=extend.right)
-    label.new(bar_index+10, {a['mp']}, "{mp_lbl}", color=color.new(color.yellow,60), textcolor=color.black, size=size.small, style=label.style_label_left)
-    // ── Call Wall ──
-    box.new(bar_index, {cw_hi}, bar_index+500, {cw_lo}, bgcolor=color.new(color.green,82), border_color=color.new(color.green,50), extend=extend.right)
-    label.new(bar_index+10, {a['cw']}, "{cw_lbl}", color=color.new(color.green,60), textcolor=color.white, size=size.small, style=label.style_label_left)
-    // ── Put Wall ──
-    box.new(bar_index, {pw_hi}, bar_index+500, {pw_lo}, bgcolor=color.new(color.red,82), border_color=color.new(color.red,50), extend=extend.right)
-    label.new(bar_index+10, {a['pw']}, "{pw_lbl}", color=color.new(color.red,60), textcolor=color.white, size=size.small, style=label.style_label_left){leaps_block}{resist_block}{support_block}
+    // Gamma Flip
+    box.new(bar_index, {gf_hi}, bar_index+1, {gf_lo}, bgcolor=color.new(color.aqua,82), border_color=color.new(color.aqua,50), extend=extend.both)
+    label.new(bar_index, {a['gf']}, "{gf_lbl}", color=color.new(color.aqua,50), textcolor=color.white, size=size.small, style=label.style_label_right, xloc=xloc.bar_index)
+    // Max Pain
+    box.new(bar_index, {mp_hi}, bar_index+1, {mp_lo}, bgcolor=color.new(color.yellow,82), border_color=color.new(color.yellow,50), extend=extend.both)
+    label.new(bar_index, {a['mp']}, "{mp_lbl}", color=color.new(color.yellow,50), textcolor=color.black, size=size.small, style=label.style_label_right, xloc=xloc.bar_index)
+    // Call Wall
+    box.new(bar_index, {cw_hi}, bar_index+1, {cw_lo}, bgcolor=color.new(color.green,82), border_color=color.new(color.green,50), extend=extend.both)
+    label.new(bar_index, {a['cw']}, "{cw_lbl}", color=color.new(color.green,50), textcolor=color.white, size=size.small, style=label.style_label_right, xloc=xloc.bar_index)
+    // Put Wall
+    box.new(bar_index, {pw_hi}, bar_index+1, {pw_lo}, bgcolor=color.new(color.red,82), border_color=color.new(color.red,50), extend=extend.both)
+    label.new(bar_index, {a['pw']}, "{pw_lbl}", color=color.new(color.red,50), textcolor=color.white, size=size.small, style=label.style_label_right, xloc=xloc.bar_index){leaps_block}{resist_block}{support_block}
 """
     return script
 
@@ -404,39 +394,40 @@ def generate_pine_universal(analyses):
 
         gf_regime = "POS GAMMA" if spot > a["gf"] else "NEG GAMMA"
         gf_lbl = f"GAMMA FLIP ${a['gf']} -- {gf_regime} | {a['score']}/10 {a['label']}"
-        mp_lbl  = f"MAX PAIN ${a['mp']} -- {'+' if a['mp'] > spot else ''}{((a['mp']-spot)/spot*100):.1f}%"
+        mp_sign = "+" if a["mp"] >= spot else ""
+        mp_lbl  = f"MAX PAIN ${a['mp']} -- {mp_sign}{((a['mp']-spot)/spot*100):.1f}%"
         cw_lbl  = f"CALL WALL ${a['cw']} -- {pct(a['cw'])}"
         pw_lbl  = f"PUT WALL ${a['pw']} -- {pct(a['pw'])}"
 
         leaps_lines = ""
         for lv in a["leaps"]:
             leaps_lines += f"""
-        line.new(bar_index, {lv}, bar_index+500, {lv}, color=color.new(color.aqua,40), width=1, extend=extend.right)
-        label.new(bar_index+10, {lv}, "LEAPS ${lv} -- {pct(lv)}", color=color.new(color.aqua,60), textcolor=color.white, size=size.small, style=label.style_label_left)"""
+        line.new(x1=bar_index, y1={lv}, x2=bar_index+1, y2={lv}, color=color.new(color.aqua,40), width=1, extend=extend.both)
+        label.new(bar_index, {lv}, "LEAPS ${lv} -- {pct(lv)}", color=color.new(color.aqua,50), textcolor=color.white, size=size.small, style=label.style_label_right, xloc=xloc.bar_index)"""
 
         resist_lines = ""
         for lv in a["resistance"]:
             resist_lines += f"""
-        line.new(bar_index, {lv}, bar_index+500, {lv}, color=color.new(color.orange,40), width=1, extend=extend.right)
-        label.new(bar_index+10, {lv}, "Resistance ${lv} -- {pct(lv)}", color=color.new(color.orange,60), textcolor=color.white, size=size.small, style=label.style_label_left)"""
+        line.new(x1=bar_index, y1={lv}, x2=bar_index+1, y2={lv}, color=color.new(color.orange,40), width=1, extend=extend.both)
+        label.new(bar_index, {lv}, "Resistance ${lv} -- {pct(lv)}", color=color.new(color.orange,50), textcolor=color.white, size=size.small, style=label.style_label_right, xloc=xloc.bar_index)"""
 
         support_lines = ""
         for lv in a["support"]:
             support_lines += f"""
-        line.new(bar_index, {lv}, bar_index+500, {lv}, color=color.new(color.red,40), width=2, extend=extend.right)
-        label.new(bar_index+10, {lv}, "Support ${lv} -- {pct(lv)}", color=color.new(color.red,60), textcolor=color.white, size=size.small, style=label.style_label_left)"""
+        line.new(x1=bar_index, y1={lv}, x2=bar_index+1, y2={lv}, color=color.new(color.red,40), width=2, extend=extend.both)
+        label.new(bar_index, {lv}, "Support ${lv} -- {pct(lv)}", color=color.new(color.red,50), textcolor=color.white, size=size.small, style=label.style_label_right, xloc=xloc.bar_index)"""
 
         block = f"""
     // ── {sym} | {a['score']}/10 {a['label']} | GF:{a['gf']} MP:{a['mp']} CW:{a['cw']} PW:{a['pw']} ──
     if syminfo.ticker == "{sym}"
-        box.new(bar_index, {gf_hi}, bar_index+500, {gf_lo}, bgcolor=color.new(color.aqua,82), border_color=color.new(color.aqua,50), extend=extend.right)
-        label.new(bar_index+10, {a['gf']}, "{gf_lbl}", color=color.new(color.aqua,60), textcolor=color.white, size=size.small, style=label.style_label_left)
-        box.new(bar_index, {mp_hi}, bar_index+500, {mp_lo}, bgcolor=color.new(color.yellow,82), border_color=color.new(color.yellow,50), extend=extend.right)
-        label.new(bar_index+10, {a['mp']}, "{mp_lbl}", color=color.new(color.yellow,60), textcolor=color.black, size=size.small, style=label.style_label_left)
-        box.new(bar_index, {cw_hi}, bar_index+500, {cw_lo}, bgcolor=color.new(color.green,82), border_color=color.new(color.green,50), extend=extend.right)
-        label.new(bar_index+10, {a['cw']}, "{cw_lbl}", color=color.new(color.green,60), textcolor=color.white, size=size.small, style=label.style_label_left)
-        box.new(bar_index, {pw_hi}, bar_index+500, {pw_lo}, bgcolor=color.new(color.red,82), border_color=color.new(color.red,50), extend=extend.right)
-        label.new(bar_index+10, {a['pw']}, "{pw_lbl}", color=color.new(color.red,60), textcolor=color.white, size=size.small, style=label.style_label_left){leaps_lines}{resist_lines}{support_lines}"""
+        box.new(bar_index, {gf_hi}, bar_index+1, {gf_lo}, bgcolor=color.new(color.aqua,82), border_color=color.new(color.aqua,50), extend=extend.both)
+        label.new(bar_index, {a['gf']}, "{gf_lbl}", color=color.new(color.aqua,50), textcolor=color.white, size=size.small, style=label.style_label_right, xloc=xloc.bar_index)
+        box.new(bar_index, {mp_hi}, bar_index+1, {mp_lo}, bgcolor=color.new(color.yellow,82), border_color=color.new(color.yellow,50), extend=extend.both)
+        label.new(bar_index, {a['mp']}, "{mp_lbl}", color=color.new(color.yellow,50), textcolor=color.black, size=size.small, style=label.style_label_right, xloc=xloc.bar_index)
+        box.new(bar_index, {cw_hi}, bar_index+1, {cw_lo}, bgcolor=color.new(color.green,82), border_color=color.new(color.green,50), extend=extend.both)
+        label.new(bar_index, {a['cw']}, "{cw_lbl}", color=color.new(color.green,50), textcolor=color.white, size=size.small, style=label.style_label_right, xloc=xloc.bar_index)
+        box.new(bar_index, {pw_hi}, bar_index+1, {pw_lo}, bgcolor=color.new(color.red,82), border_color=color.new(color.red,50), extend=extend.both)
+        label.new(bar_index, {a['pw']}, "{pw_lbl}", color=color.new(color.red,50), textcolor=color.white, size=size.small, style=label.style_label_right, xloc=xloc.bar_index){leaps_lines}{resist_lines}{support_lines}"""
         blocks.append(block)
 
     tickers = " | ".join([a["symbol"] for a in analyses])
