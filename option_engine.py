@@ -315,97 +315,100 @@ def full_analysis(symbol, progress_cb=None):
 def generate_pine_single(a):
     sym = a["symbol"]
     zone = a["zone"]
+
+    # Each line.new must be on its OWN line after the if — never inline
     leaps_lines = "\n".join([
-        f'    if syminfo.ticker == "{sym}" line.new(bar_index, {lv}, bar_index+500, {lv}, color=color.new(#00d4ff,60), width=1)'
+        f"    line.new(bar_index, {lv}, bar_index+500, {lv}, color=color.new(color.aqua,60), width=1, extend=extend.right)"
         for lv in a["leaps"]
     ])
     resist_lines = "\n".join([
-        f'    if syminfo.ticker == "{sym}" line.new(bar_index, {lv}, bar_index+500, {lv}, color=color.new(#ff6644,50), width=1)'
+        f"    line.new(bar_index, {lv}, bar_index+500, {lv}, color=color.new(color.orange,50), width=1, extend=extend.right)"
         for lv in a["resistance"]
     ])
     support_lines = "\n".join([
-        f'    if syminfo.ticker == "{sym}" line.new(bar_index, {lv}, bar_index+500, {lv}, color=color.new(#00cc66,50), width=1)'
+        f"    line.new(bar_index, {lv}, bar_index+500, {lv}, color=color.new(color.green,50), width=1, extend=extend.right)"
         for lv in a["support"]
     ])
 
-    return f"""//@version=6
-indicator("{sym} — Option Levels", overlay=true, max_lines_count=500)
+    gf_hi = round(a["gf"] + zone/2, 4); gf_lo = round(a["gf"] - zone/2, 4)
+    mp_hi = round(a["mp"] + zone/2, 4); mp_lo = round(a["mp"] - zone/2, 4)
+    cw_hi = round(a["cw"] + zone/2, 4); cw_lo = round(a["cw"] - zone/2, 4)
+    pw_hi = round(a["pw"] + zone/2, 4); pw_lo = round(a["pw"] - zone/2, 4)
 
-// ── {sym} | Spot: {a['spot']} | Score: {a['score']}/10 {a['label']} ──
-// GF: {a['gf']} | MP: {a['mp']} | CW: {a['cw']} | PW: {a['pw']}
-// Net Premium: {a['net_total_fmt']} | P/C: {a['pc_ratio']}
+    leaps_block  = f"\n    // LEAPS — aqua lines\n{leaps_lines}"  if leaps_lines.strip()  else ""
+    resist_block = f"\n    // Resistance — orange lines\n{resist_lines}" if resist_lines.strip() else ""
+    support_block= f"\n    // Support — green lines\n{support_lines}"   if support_lines.strip() else ""
+
+    script = f"""//@version=6
+indicator("{sym} — Option Levels | {a['score']}/10 {a['label']}", overlay=true, max_lines_count=500, max_boxes_count=50, max_labels_count=50)
+
+// {sym} | Spot:{a['spot']} | GF:{a['gf']} | MP:{a['mp']} | CW:{a['cw']} | PW:{a['pw']}
+// Net Premium:{a['net_total_fmt']} | P/C:{a['pc_ratio']} | Score:{a['score']}/10 {a['label']}
 
 var bool drawn = false
 if not drawn
     drawn := true
-
-    // Gamma Flip — cyan zone
-    if syminfo.ticker == "{sym}"
-        box.new(bar_index, {a['gf']+zone/2}, bar_index+500, {a['gf']-zone/2}, bgcolor=color.new(#00ffff,80), border_color=color.new(#00ffff,40))
-        label.new(bar_index, {a['gf']}, "GF {a['gf']}", color=color.new(#00ffff,70), textcolor=color.white, size=size.small)
-
+    // Gamma Flip — aqua zone
+    box.new(bar_index, {gf_hi}, bar_index+500, {gf_lo}, bgcolor=color.new(color.aqua,82), border_color=color.new(color.aqua,50), extend=extend.right)
+    label.new(bar_index+10, {a['gf']}, "GF {a['gf']}", color=color.new(color.aqua,70), textcolor=color.white, size=size.small, style=label.style_label_right)
     // Max Pain — yellow zone
-    if syminfo.ticker == "{sym}"
-        box.new(bar_index, {a['mp']+zone/2}, bar_index+500, {a['mp']-zone/2}, bgcolor=color.new(#ffdd00,85), border_color=color.new(#ffdd00,50))
-        label.new(bar_index, {a['mp']}, "MP {a['mp']}", color=color.new(#ffdd00,70), textcolor=color.black, size=size.small)
-
+    box.new(bar_index, {mp_hi}, bar_index+500, {mp_lo}, bgcolor=color.new(color.yellow,82), border_color=color.new(color.yellow,50), extend=extend.right)
+    label.new(bar_index+10, {a['mp']}, "MP {a['mp']}", color=color.new(color.yellow,70), textcolor=color.black, size=size.small, style=label.style_label_right)
     // Call Wall — green zone
-    if syminfo.ticker == "{sym}"
-        box.new(bar_index, {a['cw']+zone/2}, bar_index+500, {a['cw']-zone/2}, bgcolor=color.new(#00cc66,80), border_color=color.new(#00cc66,40))
-        label.new(bar_index, {a['cw']}, "CW {a['cw']}", color=color.new(#00cc66,70), textcolor=color.white, size=size.small)
-
+    box.new(bar_index, {cw_hi}, bar_index+500, {cw_lo}, bgcolor=color.new(color.green,82), border_color=color.new(color.green,50), extend=extend.right)
+    label.new(bar_index+10, {a['cw']}, "CW {a['cw']}", color=color.new(color.green,70), textcolor=color.white, size=size.small, style=label.style_label_right)
     // Put Wall — red zone
-    if syminfo.ticker == "{sym}"
-        box.new(bar_index, {a['pw']+zone/2}, bar_index+500, {a['pw']-zone/2}, bgcolor=color.new(#ff4455,80), border_color=color.new(#ff4455,40))
-        label.new(bar_index, {a['pw']}, "PW {a['pw']}", color=color.new(#ff4455,70), textcolor=color.white, size=size.small)
-
-    // LEAPS levels — light blue lines
-{leaps_lines}
-
-    // Resistance levels — orange lines
-{resist_lines}
-
-    // Support levels — green lines
-{support_lines}
+    box.new(bar_index, {pw_hi}, bar_index+500, {pw_lo}, bgcolor=color.new(color.red,82), border_color=color.new(color.red,50), extend=extend.right)
+    label.new(bar_index+10, {a['pw']}, "PW {a['pw']}", color=color.new(color.red,70), textcolor=color.white, size=size.small, style=label.style_label_right){leaps_block}{resist_block}{support_block}
 """
+    return script
+
 
 def generate_pine_universal(analyses):
     blocks = []
     for a in analyses:
-        sym = a["symbol"]
+        sym  = a["symbol"]
         zone = a["zone"]
+
+        # CRITICAL: line.new must be indented on its OWN line, never after if on same line
         leaps_lines = "\n".join([
-            f'        line.new(bar_index, {lv}, bar_index+500, {lv}, color=color.new(#00d4ff,60), width=1)'
+            f"        line.new(bar_index, {lv}, bar_index+500, {lv}, color=color.new(color.aqua,60), width=1, extend=extend.right)"
             for lv in a["leaps"]
         ])
         resist_lines = "\n".join([
-            f'        line.new(bar_index, {lv}, bar_index+500, {lv}, color=color.new(#ff6644,50), width=1)'
+            f"        line.new(bar_index, {lv}, bar_index+500, {lv}, color=color.new(color.orange,50), width=1, extend=extend.right)"
             for lv in a["resistance"]
         ])
         support_lines = "\n".join([
-            f'        line.new(bar_index, {lv}, bar_index+500, {lv}, color=color.new(#00cc66,50), width=1)'
+            f"        line.new(bar_index, {lv}, bar_index+500, {lv}, color=color.new(color.green,50), width=1, extend=extend.right)"
             for lv in a["support"]
         ])
 
+        gf_hi = round(a["gf"] + zone/2, 4); gf_lo = round(a["gf"] - zone/2, 4)
+        mp_hi = round(a["mp"] + zone/2, 4); mp_lo = round(a["mp"] - zone/2, 4)
+        cw_hi = round(a["cw"] + zone/2, 4); cw_lo = round(a["cw"] - zone/2, 4)
+        pw_hi = round(a["pw"] + zone/2, 4); pw_lo = round(a["pw"] - zone/2, 4)
+
+        leaps_block  = f"\n{leaps_lines}"  if leaps_lines.strip()  else ""
+        resist_block = f"\n{resist_lines}" if resist_lines.strip() else ""
+        support_block= f"\n{support_lines}"if support_lines.strip() else ""
+
         block = f"""
-    // ── {sym} | Score: {a['score']}/10 {a['label']} | GF:{a['gf']} MP:{a['mp']} CW:{a['cw']} PW:{a['pw']} ──
+    // ── {sym} | {a['score']}/10 {a['label']} | GF:{a['gf']} MP:{a['mp']} CW:{a['cw']} PW:{a['pw']} ──
     if syminfo.ticker == "{sym}"
-        box.new(bar_index, {a['gf']+zone/2}, bar_index+500, {a['gf']-zone/2}, bgcolor=color.new(#00ffff,80), border_color=color.new(#00ffff,40))
-        label.new(bar_index, {a['gf']}, "GF {a['gf']}", color=color.new(#00ffff,70), textcolor=color.white, size=size.small)
-        box.new(bar_index, {a['mp']+zone/2}, bar_index+500, {a['mp']-zone/2}, bgcolor=color.new(#ffdd00,85), border_color=color.new(#ffdd00,50))
-        label.new(bar_index, {a['mp']}, "MP {a['mp']}", color=color.new(#ffdd00,70), textcolor=color.black, size=size.small)
-        box.new(bar_index, {a['cw']+zone/2}, bar_index+500, {a['cw']-zone/2}, bgcolor=color.new(#00cc66,80), border_color=color.new(#00cc66,40))
-        label.new(bar_index, {a['cw']}, "CW {a['cw']}", color=color.new(#00cc66,70), textcolor=color.white, size=size.small)
-        box.new(bar_index, {a['pw']+zone/2}, bar_index+500, {a['pw']-zone/2}, bgcolor=color.new(#ff4455,80), border_color=color.new(#ff4455,40))
-        label.new(bar_index, {a['pw']}, "PW {a['pw']}", color=color.new(#ff4455,70), textcolor=color.white, size=size.small)
-{leaps_lines}
-{resist_lines}
-{support_lines}"""
+        box.new(bar_index, {gf_hi}, bar_index+500, {gf_lo}, bgcolor=color.new(color.aqua,82), border_color=color.new(color.aqua,50), extend=extend.right)
+        label.new(bar_index+10, {a['gf']}, "GF {a['gf']}", color=color.new(color.aqua,70), textcolor=color.white, size=size.small, style=label.style_label_right)
+        box.new(bar_index, {mp_hi}, bar_index+500, {mp_lo}, bgcolor=color.new(color.yellow,82), border_color=color.new(color.yellow,50), extend=extend.right)
+        label.new(bar_index+10, {a['mp']}, "MP {a['mp']}", color=color.new(color.yellow,70), textcolor=color.black, size=size.small, style=label.style_label_right)
+        box.new(bar_index, {cw_hi}, bar_index+500, {cw_lo}, bgcolor=color.new(color.green,82), border_color=color.new(color.green,50), extend=extend.right)
+        label.new(bar_index+10, {a['cw']}, "CW {a['cw']}", color=color.new(color.green,70), textcolor=color.white, size=size.small, style=label.style_label_right)
+        box.new(bar_index, {pw_hi}, bar_index+500, {pw_lo}, bgcolor=color.new(color.red,82), border_color=color.new(color.red,50), extend=extend.right)
+        label.new(bar_index+10, {a['pw']}, "PW {a['pw']}", color=color.new(color.red,70), textcolor=color.white, size=size.small, style=label.style_label_right){leaps_block}{resist_block}{support_block}"""
         blocks.append(block)
 
     tickers = " | ".join([a["symbol"] for a in analyses])
     return f"""//@version=6
-indicator("Universal Option Levels — {tickers}", overlay=true, max_lines_count=500)
+indicator("Universal Option Levels — {tickers}", overlay=true, max_lines_count=500, max_boxes_count=200, max_labels_count=200)
 
 var bool drawn = false
 if not drawn
