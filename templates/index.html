@@ -4,575 +4,187 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Golden Scanner</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
-
 :root {
-  --bg: #07090d;
-  --surf: #0d1117;
-  --surf2: #141a22;
-  --surf3: #1a2230;
-  --border: #1e2d3d;
-  --gold: #f0a500;
-  --gold2: #ffc94d;
-  --gold-glow: rgba(240,165,0,0.15);
-  --green: #00cc66;
-  --red: #ff4455;
-  --blue: #4499ff;
-  --purple: #bb77ff;
-  --orange: #ff8c00;
-  --cyan: #66ccff;
-  --text: #e8f0fe;
-  --muted: #4a6080;
-  --muted2: #7a9ab8;
+  --bg:#07090d; --surf:#0d1117; --surf2:#141a22; --surf3:#1a2230;
+  --border:#1e2d3d; --gold:#f0a500; --gold2:#ffc94d; --gold-glow:rgba(240,165,0,0.15);
+  --green:#00cc66; --red:#ff4455; --blue:#4499ff; --purple:#bb77ff;
+  --orange:#ff8c00; --cyan:#66ccff; --text:#e8f0fe; --muted:#4a6080; --muted2:#7a9ab8;
 }
-
-* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-html { font-size: 16px; }
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'Space Grotesk', sans-serif;
-  min-height: 100vh;
-  overflow-x: hidden;
-}
-
-/* ── HEADER ── */
-.header {
-  background: linear-gradient(180deg, #0d1117 0%, transparent 100%);
-  border-bottom: 1px solid var(--border);
-  padding: 16px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  backdrop-filter: blur(20px);
-}
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.logo-mark {
-  width: 36px; height: 36px;
-  background: var(--gold);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  flex-shrink: 0;
-}
-.logo-text {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  line-height: 1.1;
-}
-.logo-text span { color: var(--gold); }
-.logo-sub {
-  font-size: 10px;
-  color: var(--muted2);
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  font-family: 'Space Mono', monospace;
-}
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.scan-btn {
-  background: var(--gold);
-  color: #000;
-  border: none;
-  padding: 12px 24px;
-  font-family: 'Space Mono', monospace;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-.scan-btn:hover:not(:disabled) {
-  background: var(--gold2);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 24px rgba(240,165,0,0.35);
-}
-.scan-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-
-.manage-btn {
-  background: var(--surf2);
-  border: 1px solid var(--border);
-  color: var(--muted2);
-  padding: 11px 16px;
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-.manage-btn:hover { border-color: var(--gold); color: var(--gold); }
-
-/* ── STATS BAR ── */
-.stats-bar {
-  display: flex;
-  gap: 0;
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
-  scrollbar-width: none;
-  background: var(--surf);
-}
-.stats-bar::-webkit-scrollbar { display: none; }
-.stat-chip {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 10px 16px;
-  border-right: 1px solid var(--border);
-  min-width: 80px;
-  flex-shrink: 0;
-}
-.stat-chip-label {
-  font-size: 9px;
-  color: var(--muted2);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  font-family: 'Space Mono', monospace;
-  margin-bottom: 3px;
-}
-.stat-chip-val {
-  font-size: 20px;
-  font-weight: 700;
-  font-family: 'Space Mono', monospace;
-  line-height: 1;
-}
-.sv-gold { color: var(--gold); }
-.sv-green { color: var(--green); }
-.sv-yellow { color: #ffd700; }
-.sv-cyan { color: var(--cyan); }
-.sv-purple { color: var(--purple); }
-.sv-orange { color: var(--orange); }
-.sv-red { color: var(--red); }
-.sv-muted { color: var(--muted2); }
-
-/* ── FILTERS ── */
-.filters {
-  display: flex;
-  gap: 6px;
-  padding: 12px 20px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  border-bottom: 1px solid var(--border);
-  background: var(--surf);
-}
-.filters::-webkit-scrollbar { display: none; }
-.fbtn {
-  background: var(--surf2);
-  border: 1px solid var(--border);
-  color: var(--muted2);
-  padding: 6px 14px;
-  font-family: 'Space Mono', monospace;
-  font-size: 10px;
-  border-radius: 20px;
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-}
-.fbtn:hover { border-color: var(--gold); color: var(--gold); }
-.fbtn.active { background: var(--gold-glow); border-color: var(--gold); color: var(--gold); }
-.fbtn.f-gold.active { background: rgba(240,165,0,0.12); border-color: var(--gold); color: var(--gold); }
-.fbtn.f-green.active { background: rgba(0,204,102,0.1); border-color: var(--green); color: var(--green); }
-.fbtn.f-yellow.active { background: rgba(255,215,0,0.1); border-color: #ffd700; color: #ffd700; }
-.fbtn.f-blue.active { background: rgba(102,204,255,0.1); border-color: var(--cyan); color: var(--cyan); }
-.fbtn.f-purple.active { background: rgba(187,119,255,0.1); border-color: var(--purple); color: var(--purple); }
-.fbtn.f-orange.active { background: rgba(255,140,0,0.1); border-color: var(--orange); color: var(--orange); }
-.fbtn.f-red.active { background: rgba(255,68,85,0.1); border-color: var(--red); color: var(--red); }
-
-/* ── LOADING ── */
-.loading-screen {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 80px 20px;
-  gap: 20px;
-  text-align: center;
-}
-.loading-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--gold);
-  font-family: 'Space Mono', monospace;
-}
-.progress-track {
-  width: min(360px, 85vw);
-  height: 4px;
-  background: var(--surf2);
-  border-radius: 2px;
-  overflow: hidden;
-}
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--gold), var(--gold2));
-  border-radius: 2px;
-  transition: width 0.4s ease;
-}
-.loading-sub {
-  font-size: 11px;
-  color: var(--muted2);
-  font-family: 'Space Mono', monospace;
-  line-height: 1.8;
-}
-.loading-ticker {
-  font-size: 13px;
-  color: var(--gold);
-  font-family: 'Space Mono', monospace;
-  font-weight: 700;
-  min-height: 20px;
-}
-
-/* ── START SCREEN ── */
-.start-screen {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 80px 20px;
-  gap: 18px;
-  text-align: center;
-}
-.start-icon { font-size: 56px; }
-.start-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--gold);
-  letter-spacing: -0.5px;
-}
-.start-sub {
-  font-size: 13px;
-  color: var(--muted2);
-  line-height: 1.8;
-  max-width: 340px;
-  font-family: 'Space Mono', monospace;
-}
-
-/* ── CARDS GRID ── */
-.cards-grid {
-  padding: 16px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 10px;
-}
-@media (max-width: 480px) {
-  .cards-grid { grid-template-columns: 1fr; padding: 10px; gap: 8px; }
-}
-
-/* ── SECTION HEADER ── */
-.section-hdr {
-  grid-column: 1/-1;
-  font-family: 'Space Mono', monospace;
-  font-size: 9px;
-  letter-spacing: 2.5px;
-  text-transform: uppercase;
-  color: var(--muted2);
-  padding: 12px 4px 6px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 2px;
-}
-
-/* ── CARD ── */
-.card {
-  background: var(--surf);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 14px 16px;
-  transition: all 0.18s;
-  position: relative;
-  overflow: hidden;
-}
-.card:hover { transform: translateY(-2px); border-color: #2a3a4a; }
-.card:active { transform: translateY(0); }
-
-.card.c-gold { border-left: 3px solid var(--gold); box-shadow: 0 0 30px rgba(240,165,0,0.08); }
-.card.c-green { border-left: 3px solid var(--green); }
-.card.c-yellow { border-left: 3px solid #ffd700; }
-.card.c-blue { border-left: 3px solid var(--cyan); }
-.card.c-purple { border-left: 3px solid var(--purple); }
-.card.c-orange { border-left: 3px solid var(--orange); }
-.card.c-red { border-left: 3px solid var(--red); }
-
-.gold-badge {
-  position: absolute;
-  top: 10px; right: 10px;
-  background: var(--gold);
-  color: #000;
-  font-size: 9px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 10px;
-  font-family: 'Space Mono', monospace;
-  letter-spacing: 0.5px;
-}
-
-.card-top {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-.card-sym {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  font-family: 'Space Mono', monospace;
-}
-.card-price { font-size: 13px; color: var(--text); font-weight: 500; }
-.card-stage-pill {
-  margin-left: auto;
-  font-size: 9px;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-  font-family: 'Space Mono', monospace;
-}
-.pill-gold { background: rgba(240,165,0,0.15); color: var(--gold); }
-.pill-green { background: rgba(0,204,102,0.1); color: var(--green); }
-.pill-yellow { background: rgba(255,215,0,0.1); color: #ffd700; }
-.pill-blue { background: rgba(102,204,255,0.1); color: var(--cyan); }
-.pill-purple { background: rgba(187,119,255,0.1); color: var(--purple); }
-.pill-orange { background: rgba(255,140,0,0.1); color: var(--orange); }
-.pill-red { background: rgba(255,68,85,0.1); color: var(--red); }
-
-.card-inds {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-.ind {
-  background: var(--surf2);
-  border-radius: 6px;
-  padding: 7px 10px;
-}
-.ind-label {
-  font-size: 8px;
-  color: var(--muted2);
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  margin-bottom: 3px;
-  font-family: 'Space Mono', monospace;
-}
-.ind-val {
-  font-size: 14px;
-  font-weight: 700;
-  font-family: 'Space Mono', monospace;
-  line-height: 1;
-}
-.ind-sub { font-size: 9px; color: var(--muted2); margin-top: 1px; font-family: 'Space Mono', monospace; }
-
-.tsi-extreme { color: #ff6b6b; }
-.tsi-buy { color: var(--green); }
-.tsi-zero { color: var(--cyan); }
-.tsi-prof { color: var(--orange); }
-.tsi-hprof { color: var(--red); }
-.tsi-neutral { color: var(--muted2); }
-.col-up { color: var(--green); }
-.col-dn { color: var(--red); }
-.col-muted { color: var(--muted2); }
-
-.card-mas {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
-}
-.ma-chip {
-  font-size: 9px;
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-weight: 600;
-  font-family: 'Space Mono', monospace;
-}
-.ma-up { background: rgba(0,204,102,0.1); color: var(--green); }
-.ma-dn { background: rgba(255,68,85,0.08); color: var(--red); }
-
-.weekly-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  padding: 5px 10px;
-  background: var(--surf2);
-  border-radius: 6px;
-  font-family: 'Space Mono', monospace;
-}
-.wl { font-size: 9px; color: var(--muted2); text-transform: uppercase; letter-spacing: 0.8px; }
-.wv { font-size: 12px; font-weight: 700; }
-.w-star { color: var(--gold); margin-left: auto; font-size: 9px; }
-
-.card-signal {
-  font-size: 11px;
-  color: var(--muted2);
-  line-height: 1.5;
-  border-top: 1px solid var(--border);
-  padding-top: 8px;
-}
-.card-signal strong { color: var(--text); }
-
-.empty-state {
-  grid-column: 1/-1;
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--muted2);
-  font-family: 'Space Mono', monospace;
-  font-size: 12px;
-}
-
-/* ── DOWNLOAD BAR ── */
-.download-bar {
-  position: fixed;
-  bottom: 0; left: 0; right: 0;
-  background: var(--surf);
-  border-top: 1px solid var(--border);
-  padding: 12px 20px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  backdrop-filter: blur(20px);
-  z-index: 50;
-}
-.dl-info { flex: 1; font-size: 11px; color: var(--muted2); font-family: 'Space Mono', monospace; }
-.dl-info strong { color: var(--gold); }
-.dl-btn {
-  background: var(--green);
-  color: #000;
-  border: none;
-  padding: 10px 20px;
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
-  font-weight: 700;
-  border-radius: 8px;
-  cursor: pointer;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  white-space: nowrap;
-  transition: all 0.2s;
-}
-.dl-btn:hover { background: #00ff80; transform: translateY(-1px); }
-
-/* ── WATCHLIST MODAL ── */
-.modal-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.8);
-  z-index: 200;
-  backdrop-filter: blur(8px);
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-.modal-overlay.open { display: flex; }
-.modal {
-  background: var(--surf);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 24px;
-  width: 100%;
-  max-width: 560px;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.modal-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--gold);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.modal-close {
-  background: none;
-  border: none;
-  color: var(--muted2);
-  font-size: 20px;
-  cursor: pointer;
-  padding: 4px;
-}
-.modal-sub { font-size: 11px; color: var(--muted2); font-family: 'Space Mono', monospace; line-height: 1.6; }
-.modal-textarea {
-  flex: 1;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--text);
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
-  padding: 12px;
-  border-radius: 8px;
-  resize: none;
-  min-height: 200px;
-  outline: none;
-  line-height: 1.8;
-}
-.modal-textarea:focus { border-color: var(--gold); }
-.modal-footer {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-.modal-count { font-size: 11px; color: var(--muted2); font-family: 'Space Mono', monospace; flex: 1; }
-.modal-save {
-  background: var(--gold);
-  color: #000;
-  border: none;
-  padding: 10px 20px;
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
-  font-weight: 700;
-  border-radius: 8px;
-  cursor: pointer;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
-.modal-save:hover { background: var(--gold2); }
-
-.saved-toast {
-  display: none;
-  position: fixed;
-  bottom: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--green);
-  color: #000;
-  padding: 10px 20px;
-  border-radius: 20px;
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
-  font-weight: 700;
-  z-index: 300;
-}
-
-/* bottom padding for download bar */
-.cards-grid { padding-bottom: 80px; }
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;min-height:100vh;overflow-x:hidden}
+/* HEADER */
+.header{background:linear-gradient(180deg,#0d1117,transparent);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:100;backdrop-filter:blur(20px)}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:34px;height:34px;background:var(--gold);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.logo-text{font-size:17px;font-weight:700;letter-spacing:-0.5px;line-height:1.1}
+.logo-text span{color:var(--gold)}
+.logo-sub{font-size:9px;color:var(--muted2);letter-spacing:1.5px;text-transform:uppercase;font-family:'Space Mono',monospace}
+.header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.scan-btn{background:var(--gold);color:#000;border:none;padding:11px 20px;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;border-radius:8px;cursor:pointer;transition:all 0.2s;white-space:nowrap}
+.scan-btn:hover:not(:disabled){background:var(--gold2);transform:translateY(-1px);box-shadow:0 6px 24px rgba(240,165,0,0.35)}
+.scan-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+.icon-btn{background:var(--surf2);border:1px solid var(--border);color:var(--muted2);padding:10px 14px;font-family:'Space Mono',monospace;font-size:11px;border-radius:8px;cursor:pointer;transition:all 0.2s;white-space:nowrap}
+.icon-btn:hover{border-color:var(--gold);color:var(--gold)}
+/* STATS */
+.stats-bar{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;background:var(--surf)}
+.stats-bar::-webkit-scrollbar{display:none}
+.stat-chip{display:flex;flex-direction:column;align-items:center;padding:9px 14px;border-right:1px solid var(--border);min-width:72px;flex-shrink:0}
+.stat-chip-label{font-size:8px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;font-family:'Space Mono',monospace;margin-bottom:3px}
+.stat-chip-val{font-size:19px;font-weight:700;font-family:'Space Mono',monospace;line-height:1}
+.sv-gold{color:var(--gold)}.sv-green{color:var(--green)}.sv-yellow{color:#ffd700}
+.sv-cyan{color:var(--cyan)}.sv-purple{color:var(--purple)}.sv-orange{color:var(--orange)}
+.sv-red{color:var(--red)}.sv-muted{color:var(--muted2)}
+/* FILTERS */
+.filters{display:flex;gap:6px;padding:10px 16px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--border);background:var(--surf);align-items:center}
+.filters::-webkit-scrollbar{display:none}
+.fbtn{background:var(--surf2);border:1px solid var(--border);color:var(--muted2);padding:5px 13px;font-family:'Space Mono',monospace;font-size:9px;border-radius:20px;cursor:pointer;transition:all 0.15s;white-space:nowrap;letter-spacing:0.5px;text-transform:uppercase}
+.fbtn:hover{border-color:var(--gold);color:var(--gold)}
+.fbtn.active{background:var(--gold-glow);border-color:var(--gold);color:var(--gold)}
+.fbtn.f-green.active{background:rgba(0,204,102,0.1);border-color:var(--green);color:var(--green)}
+.fbtn.f-yellow.active{background:rgba(255,215,0,0.1);border-color:#ffd700;color:#ffd700}
+.fbtn.f-blue.active{background:rgba(102,204,255,0.1);border-color:var(--cyan);color:var(--cyan)}
+.fbtn.f-purple.active{background:rgba(187,119,255,0.1);border-color:var(--purple);color:var(--purple)}
+.fbtn.f-orange.active{background:rgba(255,140,0,0.1);border-color:var(--orange);color:var(--orange)}
+.fbtn.f-red.active{background:rgba(255,68,85,0.1);border-color:var(--red);color:var(--red)}
+/* UNIVERSAL PINE BTN */
+.universal-bar{display:none;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surf2);align-items:center;gap:12px}
+.universal-bar.visible{display:flex}
+.sel-count{font-size:11px;color:var(--muted2);font-family:'Space Mono',monospace;flex:1}
+.sel-count span{color:var(--gold);font-weight:700}
+.univ-btn{background:var(--purple);color:#fff;border:none;padding:9px 18px;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border-radius:8px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;transition:all 0.2s}
+.univ-btn:hover{background:#cc88ff;transform:translateY(-1px)}
+.clear-sel{background:none;border:1px solid var(--border);color:var(--muted2);padding:8px 12px;font-family:'Space Mono',monospace;font-size:10px;border-radius:8px;cursor:pointer}
+.clear-sel:hover{border-color:var(--red);color:var(--red)}
+/* LOADING */
+.loading-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;gap:18px;text-align:center}
+.loading-title{font-size:15px;font-weight:700;color:var(--gold);font-family:'Space Mono',monospace}
+.progress-track{width:min(360px,85vw);height:4px;background:var(--surf2);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:2px;transition:width 0.4s ease}
+.loading-sub{font-size:11px;color:var(--muted2);font-family:'Space Mono',monospace;line-height:1.8}
+.loading-ticker{font-size:12px;color:var(--gold);font-family:'Space Mono',monospace;font-weight:700;min-height:18px}
+/* START */
+.start-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;gap:16px;text-align:center}
+.start-icon{font-size:52px}
+.start-title{font-size:22px;font-weight:700;color:var(--gold);letter-spacing:-0.5px}
+.start-sub{font-size:12px;color:var(--muted2);line-height:1.8;max-width:320px;font-family:'Space Mono',monospace}
+/* CARDS */
+.cards-grid{padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;padding-bottom:90px}
+@media(max-width:480px){.cards-grid{grid-template-columns:1fr;padding:8px;gap:8px}}
+.section-hdr{grid-column:1/-1;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted2);padding:12px 4px 6px;border-bottom:1px solid var(--border);margin-bottom:2px}
+.card{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:14px 15px;transition:all 0.18s;position:relative;overflow:hidden}
+.card:hover{transform:translateY(-2px);border-color:#2a3a4a}
+.card.selected{border-color:var(--purple)!important;box-shadow:0 0 0 2px rgba(187,119,255,0.2)}
+.card.c-gold{border-left:3px solid var(--gold);box-shadow:0 0 28px rgba(240,165,0,0.07)}
+.card.c-green{border-left:3px solid var(--green)}
+.card.c-yellow{border-left:3px solid #ffd700}
+.card.c-blue{border-left:3px solid var(--cyan)}
+.card.c-purple{border-left:3px solid var(--purple)}
+.card.c-orange{border-left:3px solid var(--orange)}
+.card.c-red{border-left:3px solid var(--red)}
+.gold-badge{position:absolute;top:10px;right:10px;background:var(--gold);color:#000;font-size:9px;font-weight:700;padding:3px 8px;border-radius:10px;font-family:'Space Mono',monospace}
+.sel-checkbox{position:absolute;top:10px;right:10px;width:18px;height:18px;accent-color:var(--purple);cursor:pointer;display:none}
+.card.show-select .sel-checkbox{display:block}
+.card.show-select .gold-badge{display:none}
+.card-top{display:flex;align-items:baseline;gap:8px;margin-bottom:9px}
+.card-sym{font-size:19px;font-weight:700;letter-spacing:-0.5px;font-family:'Space Mono',monospace}
+.card-price{font-size:12px;color:var(--text);font-weight:500}
+.card-stage-pill{margin-left:auto;font-size:9px;font-weight:700;padding:3px 9px;border-radius:10px;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;font-family:'Space Mono',monospace}
+.pill-gold{background:rgba(240,165,0,0.15);color:var(--gold)}
+.pill-green{background:rgba(0,204,102,0.1);color:var(--green)}
+.pill-yellow{background:rgba(255,215,0,0.1);color:#ffd700}
+.pill-blue{background:rgba(102,204,255,0.1);color:var(--cyan)}
+.pill-purple{background:rgba(187,119,255,0.1);color:var(--purple)}
+.pill-orange{background:rgba(255,140,0,0.1);color:var(--orange)}
+.pill-red{background:rgba(255,68,85,0.1);color:var(--red)}
+.card-inds{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px}
+.ind{background:var(--surf2);border-radius:6px;padding:6px 9px}
+.ind-label{font-size:8px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:2px;font-family:'Space Mono',monospace}
+.ind-val{font-size:13px;font-weight:700;font-family:'Space Mono',monospace;line-height:1}
+.ind-sub{font-size:9px;color:var(--muted2);margin-top:1px;font-family:'Space Mono',monospace}
+.tsi-extreme{color:#ff6b6b}.tsi-buy{color:var(--green)}.tsi-zero{color:var(--cyan)}
+.tsi-prof{color:var(--orange)}.tsi-hprof{color:var(--red)}.tsi-neutral{color:var(--muted2)}
+.col-up{color:var(--green)}.col-dn{color:var(--red)}.col-muted{color:var(--muted2)}
+.card-mas{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+.ma-chip{font-size:9px;padding:2px 7px;border-radius:4px;font-weight:600;font-family:'Space Mono',monospace}
+.ma-up{background:rgba(0,204,102,0.1);color:var(--green)}
+.ma-dn{background:rgba(255,68,85,0.08);color:var(--red)}
+.weekly-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;padding:4px 9px;background:var(--surf2);border-radius:6px;font-family:'Space Mono',monospace}
+.wl{font-size:8px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px}
+.wv{font-size:11px;font-weight:700}
+.w-star{color:var(--gold);margin-left:auto;font-size:9px}
+.card-signal{font-size:10px;color:var(--muted2);line-height:1.5;border-top:1px solid var(--border);padding-top:7px;margin-bottom:9px}
+.card-signal strong{color:var(--text)}
+/* ACTION BUTTONS */
+.card-actions{display:flex;gap:5px}
+.act-btn{flex:1;padding:7px 4px;font-family:'Space Mono',monospace;font-size:9px;font-weight:700;border-radius:6px;cursor:pointer;border:1px solid var(--border);background:var(--surf2);color:var(--muted2);letter-spacing:0.5px;text-transform:uppercase;transition:all 0.15s;text-align:center}
+.act-btn:hover{transform:translateY(-1px)}
+.act-btn.chart-btn:hover{border-color:var(--blue);color:var(--blue)}
+.act-btn.net-btn:hover{border-color:var(--green);color:var(--green)}
+.act-btn.pine-btn:hover{border-color:var(--purple);color:var(--purple)}
+.act-btn.loading-opt{opacity:0.6;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:0.6}50%{opacity:1}}
+/* DOWNLOAD BAR */
+.download-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surf);border-top:1px solid var(--border);padding:10px 18px;display:flex;align-items:center;gap:12px;backdrop-filter:blur(20px);z-index:50}
+.dl-info{flex:1;font-size:10px;color:var(--muted2);font-family:'Space Mono',monospace}
+.dl-info strong{color:var(--gold)}
+.dl-btn{background:var(--green);color:#000;border:none;padding:9px 18px;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border-radius:8px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;transition:all 0.2s}
+.dl-btn:hover{background:#00ff80;transform:translateY(-1px)}
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:200;backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:16px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surf);border:1px solid var(--border);border-radius:14px;padding:22px;width:100%;max-width:540px;max-height:88vh;display:flex;flex-direction:column;gap:14px}
+.modal-title{font-size:15px;font-weight:700;color:var(--gold);display:flex;align-items:center;justify-content:space-between}
+.modal-close{background:none;border:none;color:var(--muted2);font-size:20px;cursor:pointer;padding:4px}
+.modal-sub{font-size:10px;color:var(--muted2);font-family:'Space Mono',monospace;line-height:1.6}
+.modal-textarea{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Space Mono',monospace;font-size:10px;padding:10px;border-radius:8px;resize:none;min-height:180px;outline:none;line-height:1.8}
+.modal-textarea:focus{border-color:var(--gold)}
+.modal-footer{display:flex;gap:10px;align-items:center}
+.modal-count{font-size:10px;color:var(--muted2);font-family:'Space Mono',monospace;flex:1}
+.modal-save{background:var(--gold);color:#000;border:none;padding:9px 18px;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border-radius:8px;cursor:pointer;letter-spacing:1px;text-transform:uppercase}
+.modal-save:hover{background:var(--gold2)}
+/* OPTION MODAL */
+.opt-modal{max-width:820px;max-height:92vh}
+.opt-tabs{display:flex;gap:6px;border-bottom:1px solid var(--border);padding-bottom:12px}
+.opt-tab{padding:7px 16px;font-family:'Space Mono',monospace;font-size:10px;border-radius:6px;cursor:pointer;border:1px solid var(--border);background:var(--surf2);color:var(--muted2);letter-spacing:0.5px;text-transform:uppercase;transition:all 0.15s}
+.opt-tab.active{border-color:var(--gold);color:var(--gold);background:var(--gold-glow)}
+.opt-content{flex:1;overflow-y:auto;display:none}
+.opt-content.active{display:block}
+/* LEVELS */
+.levels-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.level-card{background:var(--surf2);border-radius:8px;padding:10px 12px}
+.level-label{font-size:8px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-family:'Space Mono',monospace}
+.level-val{font-size:18px;font-weight:700;font-family:'Space Mono',monospace}
+.score-bar{background:var(--surf2);border-radius:8px;padding:12px;margin-bottom:14px}
+.score-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.score-num{font-size:32px;font-weight:700;font-family:'Space Mono',monospace}
+.score-label{font-size:14px;font-weight:600}
+.score-track{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.score-fill{height:100%;border-radius:3px;transition:width 0.5s ease}
+.score-breakdown{font-size:9px;color:var(--muted2);font-family:'Space Mono',monospace;line-height:2}
+.stats-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.stat-box{background:var(--surf2);border-radius:8px;padding:8px 12px;flex:1;min-width:120px}
+.stat-box-label{font-size:8px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px;font-family:'Space Mono',monospace}
+.stat-box-val{font-size:13px;font-weight:700;font-family:'Space Mono',monospace}
+/* CHART */
+.chart-wrap{background:var(--bg);border-radius:8px;padding:10px;position:relative}
+canvas{max-height:300px}
+/* PINE */
+.pine-output{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:'Space Mono',monospace;font-size:10px;color:#a8d8a8;line-height:1.6;overflow-y:auto;max-height:320px;white-space:pre-wrap;word-break:break-all}
+.copy-btn{background:var(--purple);color:#fff;border:none;padding:9px 18px;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;border-radius:8px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;transition:all 0.2s;margin-top:10px;width:100%}
+.copy-btn:hover{background:#cc88ff}
+/* OPT LOADING */
+.opt-loading{display:flex;flex-direction:column;align-items:center;gap:14px;padding:40px 20px;text-align:center}
+.opt-loading-title{font-family:'Space Mono',monospace;font-size:12px;color:var(--gold);font-weight:700}
+.opt-loading-sub{font-size:10px;color:var(--muted2);font-family:'Space Mono',monospace}
+/* TOAST */
+.toast{display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--green);color:#000;padding:9px 18px;border-radius:20px;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;z-index:400;white-space:nowrap}
+.empty-state{grid-column:1/-1;text-align:center;padding:60px;color:var(--muted2);font-family:'Space Mono',monospace;font-size:12px}
 </style>
 </head>
 <body>
-
 <div class="header">
   <div class="logo">
     <div class="logo-mark">✦</div>
@@ -582,48 +194,23 @@ body {
     </div>
   </div>
   <div class="header-right">
-    <button class="manage-btn" onclick="openModal()">⊕ WATCHLIST</button>
+    <button class="icon-btn" onclick="toggleSelectMode()">☑ SELECT</button>
+    <button class="icon-btn" onclick="openModal()">⊕ WATCHLIST</button>
     <button class="scan-btn" id="scanBtn" onclick="startScan()">▶ RUN SCAN</button>
   </div>
 </div>
 
-<!-- Stats Bar -->
 <div class="stats-bar" id="statsBar" style="display:none">
-  <div class="stat-chip">
-    <div class="stat-chip-label">Scanned</div>
-    <div class="stat-chip-val sv-muted" id="stTotal">0</div>
-  </div>
-  <div class="stat-chip">
-    <div class="stat-chip-label">🥇 Gold</div>
-    <div class="stat-chip-val sv-gold" id="stGold">0</div>
-  </div>
-  <div class="stat-chip">
-    <div class="stat-chip-label">🟢 Stage 1</div>
-    <div class="stat-chip-val sv-green" id="stGreen">0</div>
-  </div>
-  <div class="stat-chip">
-    <div class="stat-chip-label">🟡 Watch</div>
-    <div class="stat-chip-val sv-yellow" id="stYellow">0</div>
-  </div>
-  <div class="stat-chip">
-    <div class="stat-chip-label">🔵 Cont.</div>
-    <div class="stat-chip-val sv-cyan" id="stBlue">0</div>
-  </div>
-  <div class="stat-chip">
-    <div class="stat-chip-label">🟣 S2 Break</div>
-    <div class="stat-chip-val sv-purple" id="stPurple">0</div>
-  </div>
-  <div class="stat-chip">
-    <div class="stat-chip-label">🟠 Stage 3</div>
-    <div class="stat-chip-val sv-orange" id="stOrange">0</div>
-  </div>
-  <div class="stat-chip">
-    <div class="stat-chip-label">🔴 Stage 4</div>
-    <div class="stat-chip-val sv-red" id="stRed">0</div>
-  </div>
+  <div class="stat-chip"><div class="stat-chip-label">Scanned</div><div class="stat-chip-val sv-muted" id="stTotal">0</div></div>
+  <div class="stat-chip"><div class="stat-chip-label">🥇 Gold</div><div class="stat-chip-val sv-gold" id="stGold">0</div></div>
+  <div class="stat-chip"><div class="stat-chip-label">🟢 Stage 1</div><div class="stat-chip-val sv-green" id="stGreen">0</div></div>
+  <div class="stat-chip"><div class="stat-chip-label">🟡 Watch</div><div class="stat-chip-val sv-yellow" id="stYellow">0</div></div>
+  <div class="stat-chip"><div class="stat-chip-label">🔵 Cont.</div><div class="stat-chip-val sv-cyan" id="stBlue">0</div></div>
+  <div class="stat-chip"><div class="stat-chip-label">🟣 S2 Break</div><div class="stat-chip-val sv-purple" id="stPurple">0</div></div>
+  <div class="stat-chip"><div class="stat-chip-label">🟠 Stage 3</div><div class="stat-chip-val sv-orange" id="stOrange">0</div></div>
+  <div class="stat-chip"><div class="stat-chip-label">🔴 Stage 4</div><div class="stat-chip-val sv-red" id="stRed">0</div></div>
 </div>
 
-<!-- Filters -->
 <div class="filters" id="filtersBar" style="display:none">
   <button class="fbtn active" onclick="setFilter('all',this)">ALL</button>
   <button class="fbtn f-gold" onclick="setFilter('gold',this)">🥇 GOLD</button>
@@ -636,40 +223,31 @@ body {
   <button class="fbtn" onclick="setFilter('buy',this)">✓ BUY ZONE</button>
 </div>
 
-<!-- Main Content -->
+<div class="universal-bar" id="universalBar">
+  <div class="sel-count">Selected: <span id="selCount">0</span> stocks</div>
+  <button class="clear-sel" onclick="clearSelection()">✕ Clear</button>
+  <button class="univ-btn" onclick="buildUniversalPine()">📋 UNIVERSAL PINE SCRIPT</button>
+</div>
+
 <div id="mainContent">
   <div class="start-screen">
     <div class="start-icon">✦</div>
     <div class="start-title">GOLDEN SCANNER</div>
-    <div class="start-sub">
-      Gerald Peters Stage System<br>
-      TSI 25/13/8 · Daily + Weekly<br>
-      Yahoo Finance Live Data<br><br>
-      Tap <strong style="color:var(--gold)">RUN SCAN</strong> to analyze your watchlist
-    </div>
+    <div class="start-sub">Gerald Peters Stage System<br>TSI 25/13/8 · Daily + Weekly<br>Option Chain · Net Premium · Pine Script<br><br>Tap <strong style="color:var(--gold)">RUN SCAN</strong> to begin</div>
   </div>
 </div>
 
-<!-- Download Bar -->
 <div class="download-bar" id="downloadBar" style="display:none">
-  <div class="dl-info">
-    <strong id="dlDate"></strong> · <span id="dlCount"></span>
-  </div>
-  <button class="dl-btn" onclick="downloadExcel()">↓ DOWNLOAD EXCEL</button>
+  <div class="dl-info"><strong id="dlDate"></strong> · <span id="dlCount"></span></div>
+  <button class="dl-btn" onclick="downloadExcel()">↓ EXCEL</button>
 </div>
 
 <!-- Watchlist Modal -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
-    <div class="modal-title">
-      ⊕ MANAGE WATCHLIST
-      <button class="modal-close" onclick="closeModal()">✕</button>
-    </div>
-    <div class="modal-sub">
-      One ticker per line or comma separated.<br>
-      Changes are saved automatically for next scan.
-    </div>
-    <textarea class="modal-textarea" id="watchlistInput" oninput="updateCount()" placeholder="AAPL&#10;NVDA&#10;TSLA..."></textarea>
+    <div class="modal-title">⊕ MANAGE WATCHLIST<button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-sub">One ticker per line or comma separated. Changes saved automatically.</div>
+    <textarea class="modal-textarea" id="watchlistInput" oninput="updateCount()"></textarea>
     <div class="modal-footer">
       <div class="modal-count" id="modalCount">0 tickers</div>
       <button class="modal-save" onclick="saveWatchlist()">SAVE</button>
@@ -677,234 +255,444 @@ body {
   </div>
 </div>
 
-<div class="saved-toast" id="savedToast">✓ Watchlist saved!</div>
+<!-- Option Chain Modal -->
+<div class="modal-overlay" id="optModalOverlay">
+  <div class="modal opt-modal">
+    <div class="modal-title">
+      <span id="optModalTitle">Option Analysis</span>
+      <button class="modal-close" onclick="closeOptModal()">✕</button>
+    </div>
+    <div class="opt-tabs">
+      <button class="opt-tab active" onclick="switchTab('chart',this)">📊 CHART</button>
+      <button class="opt-tab" onclick="switchTab('net',this)">💰 NET PREMIUM</button>
+      <button class="opt-tab" onclick="switchTab('pine',this)">📋 PINE SCRIPT</button>
+    </div>
+    <div id="optLoading" class="opt-loading" style="display:none">
+      <div class="opt-loading-title">FETCHING OPTION CHAIN</div>
+      <div class="progress-track"><div class="progress-fill" id="optPFill" style="width:0%"></div></div>
+      <div class="opt-loading-sub" id="optLoadSub">Connecting to Tradier...</div>
+    </div>
+    <!-- Chart Tab -->
+    <div class="opt-content active" id="tab-chart">
+      <div class="score-bar" id="scoreBar" style="display:none">
+        <div class="score-row">
+          <div class="score-num" id="scoreNum">—</div>
+          <div>
+            <div class="score-label" id="scoreLabel">—</div>
+            <div style="font-size:10px;color:var(--muted2);font-family:'Space Mono',monospace">Bull/Bear Score /10</div>
+          </div>
+          <div class="score-track"><div class="score-fill" id="scoreFill" style="width:0%"></div></div>
+        </div>
+        <div class="score-breakdown" id="scoreBreakdown"></div>
+      </div>
+      <div class="levels-grid" id="levelsGrid" style="display:none">
+        <div class="level-card"><div class="level-label">Gamma Flip</div><div class="level-val" id="lvGF" style="color:var(--cyan)">—</div></div>
+        <div class="level-card"><div class="level-label">Max Pain</div><div class="level-val" id="lvMP" style="color:#ffd700">—</div></div>
+        <div class="level-card"><div class="level-label">Call Wall</div><div class="level-val" id="lvCW" style="color:var(--green)">—</div></div>
+        <div class="level-card"><div class="level-label">Put Wall</div><div class="level-val" id="lvPW" style="color:var(--red)">—</div></div>
+        <div class="level-card"><div class="level-label">P/C Ratio</div><div class="level-val" id="lvPC" style="color:var(--muted2)">—</div></div>
+        <div class="level-card"><div class="level-label">Current Price</div><div class="level-val" id="lvSpot" style="color:var(--text)">—</div></div>
+      </div>
+      <div class="stats-row" id="statsRow" style="display:none">
+        <div class="stat-box"><div class="stat-box-label">Net Premium</div><div class="stat-box-val" id="stNetTotal">—</div></div>
+        <div class="stat-box"><div class="stat-box-label">Call Premium</div><div class="stat-box-val" style="color:var(--green)" id="stCallTotal">—</div></div>
+        <div class="stat-box"><div class="stat-box-label">Put Premium</div><div class="stat-box-val" style="color:var(--red)" id="stPutTotal">—</div></div>
+        <div class="stat-box"><div class="stat-box-label">Strikes</div><div class="stat-box-val" style="color:var(--muted2)" id="stStrikes">—</div></div>
+      </div>
+      <div id="leapsWrap" style="display:none;margin-bottom:12px">
+        <div style="font-size:9px;color:var(--muted2);font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">LEAPS Targets</div>
+        <div id="leapsList" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      </div>
+    </div>
+    <!-- Net Premium Tab -->
+    <div class="opt-content" id="tab-net">
+      <div class="chart-wrap"><canvas id="netChart"></canvas></div>
+      <div style="font-size:9px;color:var(--muted2);font-family:'Space Mono',monospace;margin-top:8px;line-height:1.8;padding:0 4px">
+        🟢 Green bar = call dominant (bulls paid here) &nbsp;|&nbsp; 🔴 Red bar = put dominant (bears paid here)<br>
+        Dashed line = current price &nbsp;|&nbsp; Taller bar = more real dollars committed at that strike
+      </div>
+    </div>
+    <!-- Pine Script Tab -->
+    <div class="opt-content" id="tab-pine">
+      <div style="font-size:10px;color:var(--muted2);font-family:'Space Mono',monospace;margin-bottom:10px;line-height:1.6">
+        Copy this script → open TradingView → Pine Script Editor → New → Paste → Save → Add to Chart
+      </div>
+      <div class="pine-output" id="pineOutput">// Pine Script will appear here after analysis loads</div>
+      <button class="copy-btn" onclick="copyPine()">📋 COPY PINE SCRIPT</button>
+    </div>
+  </div>
+</div>
+
+<!-- Universal Pine Modal -->
+<div class="modal-overlay" id="univModalOverlay">
+  <div class="modal opt-modal">
+    <div class="modal-title">
+      📋 UNIVERSAL PINE SCRIPT
+      <button class="modal-close" onclick="document.getElementById('univModalOverlay').classList.remove('open')">✕</button>
+    </div>
+    <div style="font-size:10px;color:var(--muted2);font-family:'Space Mono',monospace;line-height:1.6">
+      Works on all selected tickers. Paste once in TradingView — switch charts and levels update automatically.
+    </div>
+    <div id="univLoading" style="display:none;text-align:center;padding:20px;color:var(--gold);font-family:'Space Mono',monospace;font-size:11px">
+      Building universal script...
+    </div>
+    <div class="pine-output" id="univPineOutput" style="min-height:200px">// Select stocks and click "Universal Pine Script" to generate</div>
+    <button class="copy-btn" onclick="copyUnivPine()">📋 COPY UNIVERSAL PINE SCRIPT</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script>
-let allResults = [];
-let currentFilter = 'all';
-let scanInterval = null;
-let currentWatchlist = [];
+let allResults=[], currentFilter='all', scanInterval=null, currentWatchlist=[];
+let selectMode=false, selectedSyms=new Set();
+let optChart=null, currentOptSym=null, optPollInterval=null;
 
-const STAGE_COLORS = {
-  'gold':'c-gold','stage-1-green':'c-green','stage-1-yellow':'c-yellow',
-  'stage-1-blue':'c-blue','stage-2b':'c-purple','stage-3':'c-orange',
-  'stage-4':'c-red','stage-2':'c-muted'
-};
-const PILL_COLORS = {
-  'gold':'pill-gold','stage-1-green':'pill-green','stage-1-yellow':'pill-yellow',
-  'stage-1-blue':'pill-blue','stage-2b':'pill-purple','stage-3':'pill-orange',
-  'stage-4':'pill-red'
-};
-const SEC_NAMES = {
-  'gold':'🥇 GOLD SETUPS — Daily + Weekly TSI <-20 — HIGHEST CONVICTION',
-  'stage-1-green':'🟢 STAGE 1 CONFIRMED — TSI <-20 + Candle Above 7 EMA — BUY',
-  'stage-1-yellow':'🟡 WATCHING — TSI <-20, Waiting for Candle Above 7 EMA',
-  'stage-1-blue':'🔵 STAGE 1 CONTINUATION — TSI Below 0 + Candle Above 7 EMA',
-  'stage-2b':'🟣 S2 BREAKOUT — Candle Above 21 EMA — Last Entry',
-  'stage-3':'🟠 STAGE 3 — Distribution — Consider Taking Profits',
-  'stage-4':'🔴 STAGE 4 — Decline — EXIT NOW',
-};
-const ORDER = {'gold':0,'stage-1-green':1,'stage-1-yellow':2,'stage-1-blue':3,'stage-2b':4,'stage-3':5,'stage-4':6,'stage-2':7};
+const STAGE_COLORS={'gold':'c-gold','stage-1-green':'c-green','stage-1-yellow':'c-yellow','stage-1-blue':'c-blue','stage-2b':'c-purple','stage-3':'c-orange','stage-4':'c-red','stage-2':'c-muted'};
+const PILL_COLORS={'gold':'pill-gold','stage-1-green':'pill-green','stage-1-yellow':'pill-yellow','stage-1-blue':'pill-blue','stage-2b':'pill-purple','stage-3':'pill-orange','stage-4':'pill-red'};
+const SEC_NAMES={'gold':'🥇 GOLD SETUPS — Daily + Weekly TSI <-20','stage-1-green':'🟢 STAGE 1 CONFIRMED — TSI <-20 + Candle Above 7 EMA','stage-1-yellow':'🟡 WATCHING — TSI <-20, Wait for Candle Above 7 EMA','stage-1-blue':'🔵 STAGE 1 CONTINUATION — TSI Below 0 + Candle Above 7 EMA','stage-2b':'🟣 S2 BREAKOUT — Candle Above 21 EMA — Last Entry','stage-3':'🟠 STAGE 3 — Distribution — Consider Taking Profits','stage-4':'🔴 STAGE 4 — Decline — EXIT NOW'};
+const ORDER={'gold':0,'stage-1-green':1,'stage-1-yellow':2,'stage-1-blue':3,'stage-2b':4,'stage-3':5,'stage-4':6,'stage-2':7};
+const COLORS={'gold':'#f0a500','stage-1-green':'#00cc66','stage-1-yellow':'#ffd700','stage-1-blue':'#66ccff','stage-2b':'#bb77ff','stage-3':'#ff8c00','stage-4':'#ff4455','stage-2':'#7a9ab8'};
 
-function tsiClass(v) {
-  if(v==null) return 'tsi-neutral';
-  if(v<-40) return 'tsi-extreme'; if(v<-20) return 'tsi-buy';
-  if(v<0) return 'tsi-zero'; if(v>40) return 'tsi-hprof'; if(v>20) return 'tsi-prof';
-  return 'tsi-neutral';
-}
-function tsiZone(v) {
-  if(v==null) return '—';
-  if(v<-40) return '🔥🔥 EXTREME'; if(v<-20) return '🔥 BUY ZONE';
-  if(v>40) return '⚠ HEAVY'; if(v>20) return '⚠ PROFITS';
-  if(v<0) return 'BELOW ZERO'; return 'NEUTRAL';
-}
+function tsiClass(v){if(v==null)return 'tsi-neutral';if(v<-40)return 'tsi-extreme';if(v<-20)return 'tsi-buy';if(v<0)return 'tsi-zero';if(v>40)return 'tsi-hprof';if(v>20)return 'tsi-prof';return 'tsi-neutral'}
+function tsiZone(v){if(v==null)return '—';if(v<-40)return '🔥🔥 EXTREME';if(v<-20)return '🔥 BUY ZONE';if(v>40)return '⚠ HEAVY';if(v>20)return '⚠ PROFITS';if(v<0)return 'BELOW ZERO';return 'NEUTRAL'}
 
-function renderCard(r) {
-  const cc = STAGE_COLORS[r.sk] || '';
-  const pc = PILL_COLORS[r.sk] || 'pill-green';
-  const tdir_col = r.tsi_dir === '↑' ? 'col-up' : 'col-dn';
-  const wtsi_html = r.wtsi != null ? `
-    <div class="weekly-row">
-      <span class="wl">WEEKLY TSI</span>
-      <span class="wv ${tsiClass(r.wtsi)}">${r.wtsi.toFixed(1)}</span>
-      ${r.wtsi < -20 ? '<span class="w-star">★ WEEKLY ALIGNED</span>' : ''}
-    </div>` : '';
-
-  return `
-  <div class="card ${cc}" data-sk="${r.sk}" data-buy="${r.buy}" data-gold="${r.is_gold}">
-    ${r.is_gold ? '<div class="gold-badge">🔥 GOLD</div>' : ''}
+function renderCard(r){
+  const cc=STAGE_COLORS[r.sk]||'';const pc=PILL_COLORS[r.sk]||'pill-green';
+  const tc=r.tsi_dir==='↑'?'col-up':'col-dn';
+  const isSelected=selectedSyms.has(r.sym);
+  const wtsi=r.wtsi!=null?`<div class="weekly-row"><span class="wl">WEEKLY TSI</span><span class="wv ${tsiClass(r.wtsi)}">${r.wtsi.toFixed(1)}</span>${r.wtsi<-20?'<span class="w-star">★ WEEKLY</span>':''}</div>`:'';
+  return `<div class="card ${cc}${isSelected?' selected':''}" data-sym="${r.sym}">
+    ${r.is_gold?'<div class="gold-badge">🔥 GOLD</div>':''}
+    <input type="checkbox" class="sel-checkbox" ${isSelected?'checked':''} onchange="toggleSelect('${r.sym}',this)">
     <div class="card-top">
-      <span class="card-sym" style="color:${getColor(r.sk)}">${r.sym}</span>
-      <span class="card-price">$${r.price?.toFixed(2) ?? '—'}</span>
+      <span class="card-sym" style="color:${COLORS[r.sk]||'#e8f0fe'}">${r.sym}</span>
+      <span class="card-price">$${r.price?.toFixed(2)??(r.price||'—')}</span>
       <span class="card-stage-pill ${pc}">${r.label}</span>
     </div>
     <div class="card-inds">
-      <div class="ind">
-        <div class="ind-label">Daily TSI</div>
-        <div class="ind-val ${tsiClass(r.tsi)}">${r.tsi?.toFixed(1) ?? 'N/A'} <span class="${tdir_col}" style="font-size:12px">${r.tsi_dir}</span></div>
-        <div class="ind-sub">${tsiZone(r.tsi)}</div>
-      </div>
-      <div class="ind">
-        <div class="ind-label">Weekly TSI</div>
-        <div class="ind-val ${tsiClass(r.wtsi)}">${r.wtsi?.toFixed(1) ?? '—'}</div>
-        <div class="ind-sub">${r.wtsi != null ? tsiZone(r.wtsi) : '—'}</div>
-      </div>
+      <div class="ind"><div class="ind-label">Daily TSI</div><div class="ind-val ${tsiClass(r.tsi)}">${r.tsi?.toFixed(1)??'N/A'} <span class="${tc}" style="font-size:11px">${r.tsi_dir}</span></div><div class="ind-sub">${tsiZone(r.tsi)}</div></div>
+      <div class="ind"><div class="ind-label">Weekly TSI</div><div class="ind-val ${tsiClass(r.wtsi)}">${r.wtsi?.toFixed(1)??'—'}</div><div class="ind-sub">${r.wtsi!=null?tsiZone(r.wtsi):'—'}</div></div>
     </div>
     <div class="card-mas">
-      <span class="ma-chip ${r.ab7 ? 'ma-up':'ma-dn'}">${r.ab7 ? '↑':'↓'} 7 EMA</span>
-      <span class="ma-chip ${r.ab21 ? 'ma-up':'ma-dn'}">${r.ab21 ? '↑':'↓'} 21 EMA</span>
-      ${r.ab200 != null ? `<span class="ma-chip ${r.ab200 ? 'ma-up':'ma-dn'}">${r.ab200 ? '↑':'↓'} 200 SMA</span>` : ''}
+      <span class="ma-chip ${r.ab7?'ma-up':'ma-dn'}">${r.ab7?'↑':'↓'} 7 EMA</span>
+      <span class="ma-chip ${r.ab21?'ma-up':'ma-dn'}">${r.ab21?'↑':'↓'} 21 EMA</span>
+      ${r.ab200!=null?`<span class="ma-chip ${r.ab200?'ma-up':'ma-dn'}">${r.ab200?'↑':'↓'} 200 SMA</span>`:''}
     </div>
-    ${wtsi_html}
+    ${wtsi}
     <div class="card-signal"><strong>→</strong> ${r.signal}</div>
+    <div class="card-actions">
+      <button class="act-btn chart-btn" onclick="openOptionModal('${r.sym}','chart')">📊 CHART</button>
+      <button class="act-btn net-btn" onclick="openOptionModal('${r.sym}','net')">💰 NET PREMIUM</button>
+      <button class="act-btn pine-btn" onclick="openOptionModal('${r.sym}','pine')">📋 PINE SCRIPT</button>
+    </div>
   </div>`;
 }
 
-function getColor(sk) {
-  const map = {'gold':'#f0a500','stage-1-green':'#00cc66','stage-1-yellow':'#ffd700',
-               'stage-1-blue':'#66ccff','stage-2b':'#bb77ff','stage-3':'#ff8c00',
-               'stage-4':'#ff4455','stage-2':'#7a9ab8'};
-  return map[sk] || '#e8f0fe';
-}
-
-function renderResults(filter) {
-  let data = [...allResults];
-  if(filter === 'all') data = data.filter(r => r.sk !== 'stage-2');
-  else if(filter === 'buy') data = data.filter(r => r.buy);
-  else if(filter === 'gold') data = data.filter(r => r.is_gold);
-  else data = data.filter(r => r.sk === filter);
-
-  data.sort((a,b) => {
-    if(a.is_gold !== b.is_gold) return b.is_gold ? 1 : -1;
-    return (ORDER[a.sk]||9) - (ORDER[b.sk]||9) || a.sym.localeCompare(b.sym);
-  });
-
-  let html = '<div class="cards-grid">';
-  if(!data.length) {
-    html += '<div class="empty-state">No stocks match this filter right now.</div>';
-  } else {
-    let lastSk = '';
-    for(const r of data) {
-      const sec = r.is_gold ? '🥇 GOLD SETUPS — Daily + Weekly Stage 1 Aligned' : SEC_NAMES[r.sk] || '';
-      if(sec !== lastSk && (filter === 'all' || filter === 'buy')) {
-        html += `<div class="section-hdr">${sec}</div>`;
-        lastSk = sec;
-      }
-      html += renderCard(r);
+function renderResults(filter){
+  let data=[...allResults];
+  if(filter==='all') data=data.filter(r=>r.sk!=='stage-2');
+  else if(filter==='buy') data=data.filter(r=>r.buy);
+  else if(filter==='gold') data=data.filter(r=>r.is_gold);
+  else data=data.filter(r=>r.sk===filter);
+  data.sort((a,b)=>{if(a.is_gold!==b.is_gold)return b.is_gold?1:-1;return(ORDER[a.sk]||9)-(ORDER[b.sk]||9)||a.sym.localeCompare(b.sym)});
+  let html='<div class="cards-grid">';
+  if(!data.length){html+='<div class="empty-state">No stocks match this filter right now.</div>';}
+  else{
+    let lsk='';
+    for(const r of data){
+      const sec=r.is_gold?'🥇 GOLD SETUPS — Daily + Weekly Stage 1 Aligned':SEC_NAMES[r.sk]||'';
+      if(sec!==lsk&&(filter==='all'||filter==='buy')){html+=`<div class="section-hdr">${sec}</div>`;lsk=sec}
+      html+=renderCard(r);
     }
   }
-  html += '</div>';
-  document.getElementById('mainContent').innerHTML = html;
+  html+='</div>';
+  document.getElementById('mainContent').innerHTML=html;
+  if(selectMode) document.querySelectorAll('.sel-checkbox').forEach(el=>el.style.display='block');
 }
 
-function setFilter(f, btn) {
-  currentFilter = f;
-  document.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  if(allResults.length) renderResults(f);
+function setFilter(f,btn){currentFilter=f;document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');if(allResults.length)renderResults(f)}
+
+// ── SCAN ──────────────────────────────────────────────────────────────────
+async function startScan(){
+  const btn=document.getElementById('scanBtn');
+  btn.disabled=true;btn.textContent='⏳ SCANNING...';
+  document.getElementById('statsBar').style.display='flex';
+  document.getElementById('filtersBar').style.display='flex';
+  document.getElementById('downloadBar').style.display='none';
+  allResults=[];
+  document.getElementById('mainContent').innerHTML=`<div class="loading-screen"><div class="loading-title">SCANNING YOUR WATCHLIST</div><div class="progress-track"><div class="progress-fill" id="pFill" style="width:0%"></div></div><div class="loading-sub">TSI 25/13/8 · 7 EMA · 21 EMA · 200 SMA<br>Daily + Weekly · Gerald Peters Stages</div><div class="loading-ticker" id="lTick">Connecting to Yahoo Finance...</div></div>`;
+  const wlRes=await fetch('/api/watchlist');const wlData=await wlRes.json();currentWatchlist=wlData.tickers;
+  await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({watchlist:currentWatchlist})});
+  scanInterval=setInterval(pollProgress,1200);
 }
 
-async function startScan() {
-  const btn = document.getElementById('scanBtn');
-  btn.disabled = true; btn.textContent = '⏳ SCANNING...';
-  document.getElementById('statsBar').style.display = 'flex';
-  document.getElementById('filtersBar').style.display = 'flex';
-  document.getElementById('downloadBar').style.display = 'none';
-  allResults = [];
-
-  document.getElementById('mainContent').innerHTML = `
-    <div class="loading-screen">
-      <div class="loading-title">SCANNING YOUR WATCHLIST</div>
-      <div class="progress-track"><div class="progress-fill" id="pFill" style="width:0%"></div></div>
-      <div class="loading-sub">TSI 25/13/8 · 7 EMA · 21 EMA · 200 SMA<br>Daily + Weekly · Gerald Peters Stages</div>
-      <div class="loading-ticker" id="lTick">Connecting to Yahoo Finance...</div>
-    </div>`;
-
-  const wlRes = await fetch('/api/watchlist');
-  const wlData = await wlRes.json();
-  currentWatchlist = wlData.tickers;
-
-  await fetch('/api/scan', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({watchlist: currentWatchlist})});
-
-  scanInterval = setInterval(pollProgress, 1200);
-}
-
-async function pollProgress() {
-  const res = await fetch('/api/progress');
-  const data = await res.json();
-
-  const pct = data.total > 0 ? (data.progress / data.total * 100) : 0;
-  const fill = document.getElementById('pFill');
-  const tick = document.getElementById('lTick');
-  if(fill) fill.style.width = pct + '%';
-  if(tick) tick.textContent = data.current ? `Analyzing ${data.current}... (${data.progress}/${data.total})` : 'Starting...';
-
-  document.getElementById('stTotal').textContent = data.scanned;
-  document.getElementById('stGold').textContent = data.counts.gold || 0;
-  document.getElementById('stGreen').textContent = data.counts['stage-1-green'] || 0;
-  document.getElementById('stYellow').textContent = data.counts['stage-1-yellow'] || 0;
-  document.getElementById('stBlue').textContent = data.counts['stage-1-blue'] || 0;
-  document.getElementById('stPurple').textContent = data.counts['stage-2b'] || 0;
-  document.getElementById('stOrange').textContent = data.counts['stage-3'] || 0;
-  document.getElementById('stRed').textContent = data.counts['stage-4'] || 0;
-
-  if(data.done) {
+async function pollProgress(){
+  const res=await fetch('/api/progress');const data=await res.json();
+  const pct=data.total>0?(data.progress/data.total*100):0;
+  const fill=document.getElementById('pFill');const tick=document.getElementById('lTick');
+  if(fill)fill.style.width=pct+'%';
+  if(tick)tick.textContent=data.current?`Analyzing ${data.current}... (${data.progress}/${data.total})`:'Starting...';
+  document.getElementById('stTotal').textContent=data.scanned;
+  document.getElementById('stGold').textContent=data.counts.gold||0;
+  document.getElementById('stGreen').textContent=data.counts['stage-1-green']||0;
+  document.getElementById('stYellow').textContent=data.counts['stage-1-yellow']||0;
+  document.getElementById('stBlue').textContent=data.counts['stage-1-blue']||0;
+  document.getElementById('stPurple').textContent=data.counts['stage-2b']||0;
+  document.getElementById('stOrange').textContent=data.counts['stage-3']||0;
+  document.getElementById('stRed').textContent=data.counts['stage-4']||0;
+  if(data.done){
     clearInterval(scanInterval);
-    const res2 = await fetch('/api/results');
-    const results = await res2.json();
-    allResults = results.results;
-
-    renderResults(currentFilter);
-
-    const btn = document.getElementById('scanBtn');
-    btn.disabled = false; btn.textContent = '↺ RESCAN';
-
-    const dlBar = document.getElementById('downloadBar');
-    dlBar.style.display = 'flex';
-    document.getElementById('dlDate').textContent = results.date;
-    document.getElementById('dlCount').textContent = `${allResults.length} setups found`;
+    const res2=await fetch('/api/results');const results=await res2.json();
+    allResults=results.results;renderResults(currentFilter);
+    const btn=document.getElementById('scanBtn');btn.disabled=false;btn.textContent='↺ RESCAN';
+    document.getElementById('downloadBar').style.display='flex';
+    document.getElementById('dlDate').textContent=results.date;
+    document.getElementById('dlCount').textContent=`${allResults.length} setups found`;
   }
 }
 
-function downloadExcel() {
-  window.location.href = '/api/download';
+function downloadExcel(){window.location.href='/api/download'}
+
+// ── SELECT MODE ───────────────────────────────────────────────────────────
+function toggleSelectMode(){
+  selectMode=!selectMode;
+  if(!selectMode){clearSelection();return}
+  document.querySelectorAll('.sel-checkbox').forEach(el=>el.style.display='block');
+  document.querySelectorAll('.gold-badge').forEach(el=>el.style.display='none');
+  showToast('Tap stocks to select for Universal Pine Script');
 }
 
-// ── WATCHLIST MODAL ──
-async function openModal() {
-  const res = await fetch('/api/watchlist');
-  const data = await res.json();
-  document.getElementById('watchlistInput').value = data.tickers.join('\n');
-  updateCount();
-  document.getElementById('modalOverlay').classList.add('open');
+function toggleSelect(sym,cb){
+  if(cb.checked) selectedSyms.add(sym);
+  else selectedSyms.delete(sym);
+  const card=document.querySelector(`.card[data-sym="${sym}"]`);
+  if(card) card.classList.toggle('selected',cb.checked);
+  updateUniversalBar();
 }
 
-function closeModal() {
-  document.getElementById('modalOverlay').classList.remove('open');
+function updateUniversalBar(){
+  const bar=document.getElementById('universalBar');
+  document.getElementById('selCount').textContent=selectedSyms.size;
+  if(selectedSyms.size>0) bar.classList.add('visible');
+  else bar.classList.remove('visible');
 }
 
-function updateCount() {
-  const tickers = document.getElementById('watchlistInput').value
-    .split(/[\n,]+/).map(t=>t.trim().toUpperCase()).filter(Boolean);
-  document.getElementById('modalCount').textContent = tickers.length + ' tickers';
+function clearSelection(){
+  selectedSyms.clear();selectMode=false;
+  document.querySelectorAll('.sel-checkbox').forEach(el=>{el.style.display='none';el.checked=false});
+  document.querySelectorAll('.gold-badge').forEach(el=>el.style.display='block');
+  document.querySelectorAll('.card').forEach(el=>el.classList.remove('selected'));
+  document.getElementById('universalBar').classList.remove('visible');
 }
 
-async function saveWatchlist() {
-  const tickers = document.getElementById('watchlistInput').value
-    .split(/[\n,]+/).map(t=>t.trim().toUpperCase()).filter(Boolean);
-  await fetch('/api/watchlist', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({tickers})});
-  document.getElementById('modalCount').textContent = tickers.length + ' tickers saved!';
-  const toast = document.getElementById('savedToast');
-  toast.style.display = 'block';
-  setTimeout(() => { toast.style.display = 'none'; closeModal(); }, 1500);
+// ── OPTION MODAL ──────────────────────────────────────────────────────────
+async function openOptionModal(sym,tab){
+  currentOptSym=sym;
+  document.getElementById('optModalTitle').textContent=`${sym} — Option Analysis`;
+  document.getElementById('optModalOverlay').classList.add('open');
+  switchTab(tab,document.querySelector(`.opt-tab[onclick*="${tab}"]`));
+  // Start analysis if not already done
+  const check=await fetch(`/api/options/progress/${sym}`);
+  const state=await check.json();
+  if(state.state==='not_started'||state.state==='error'){
+    await fetch(`/api/options/start/${sym}`,{method:'POST'});
+  }
+  if(state.state!=='done') startOptPolling(sym);
+  else loadOptResults(sym);
 }
 
-// Close modal on overlay click
-document.getElementById('modalOverlay').addEventListener('click', function(e) {
-  if(e.target === this) closeModal();
-});
+function closeOptModal(){
+  document.getElementById('optModalOverlay').classList.remove('open');
+  if(optPollInterval){clearInterval(optPollInterval);optPollInterval=null}
+}
+
+function switchTab(tab, btn){
+  document.querySelectorAll('.opt-tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.opt-content').forEach(c=>c.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  else document.querySelectorAll('.opt-tab').forEach(b=>{if(b.getAttribute('onclick')?.includes(tab)) b.classList.add('active')});
+  const el=document.getElementById('tab-'+tab);if(el)el.classList.add('active');
+}
+
+function startOptPolling(sym){
+  document.getElementById('optLoading').style.display='flex';
+  document.getElementById('scoreBar').style.display='none';
+  document.getElementById('levelsGrid').style.display='none';
+  document.getElementById('statsRow').style.display='none';
+  if(optPollInterval) clearInterval(optPollInterval);
+  optPollInterval=setInterval(async()=>{
+    const res=await fetch(`/api/options/progress/${sym}`);
+    const data=await res.json();
+    const pct=data.total>0?(data.progress/data.total*100):5;
+    const fill=document.getElementById('optPFill');
+    if(fill) fill.style.width=pct+'%';
+    const sub=document.getElementById('optLoadSub');
+    if(sub) sub.textContent=data.exp?`Fetching ${data.exp} (${data.progress}/${data.total} expirations)`:'Fetching option chain...';
+    if(data.state==='done'){clearInterval(optPollInterval);optPollInterval=null;document.getElementById('optLoading').style.display='none';loadOptResults(sym)}
+    else if(data.state==='error'){clearInterval(optPollInterval);optPollInterval=null;document.getElementById('optLoading').style.display='none';document.getElementById('optLoadSub').textContent='Error: '+data.error}
+  },1000);
+}
+
+async function loadOptResults(sym){
+  document.getElementById('optLoading').style.display='none';
+  // Load summary
+  const res=await fetch(`/api/options/result/${sym}`);
+  if(!res.ok) return;
+  const d=await res.json();
+  // Score
+  const scoreColors={10:'#00cc66',9:'#00cc66',8:'#66cc88',7:'#ffd700',6:'#ffd700',5:'#ff8c00',4:'#ff8c00',3:'#ff4455',2:'#ff4455',1:'#ff4455',0:'#ff4455'};
+  const sc=d.score||0;
+  document.getElementById('scoreNum').textContent=sc+'/10';
+  document.getElementById('scoreNum').style.color=scoreColors[sc]||'#ff4455';
+  document.getElementById('scoreLabel').textContent=d.label||'—';
+  document.getElementById('scoreLabel').style.color=scoreColors[sc]||'#ff4455';
+  document.getElementById('scoreFill').style.width=(sc/10*100)+'%';
+  document.getElementById('scoreFill').style.background=scoreColors[sc]||'#ff4455';
+  document.getElementById('scoreBreakdown').textContent=(d.breakdown||[]).join('  ·  ');
+  document.getElementById('scoreBar').style.display='block';
+  // Levels
+  document.getElementById('lvGF').textContent='$'+d.gf;
+  document.getElementById('lvMP').textContent='$'+d.mp;
+  document.getElementById('lvCW').textContent='$'+d.cw;
+  document.getElementById('lvPW').textContent='$'+d.pw;
+  document.getElementById('lvPC').textContent=d.pc_ratio;
+  document.getElementById('lvPC').style.color=d.pc_ratio<0.9?'var(--green)':d.pc_ratio>1.1?'var(--red)':'var(--muted2)';
+  document.getElementById('lvSpot').textContent='$'+d.spot;
+  document.getElementById('levelsGrid').style.display='grid';
+  // Stats
+  document.getElementById('stNetTotal').textContent=d.net_total_fmt;
+  document.getElementById('stNetTotal').style.color=d.net_total>0?'var(--green)':'var(--red)';
+  document.getElementById('stCallTotal').textContent=d.call_fmt;
+  document.getElementById('stPutTotal').textContent=d.put_fmt;
+  document.getElementById('stStrikes').textContent=d.strike_count;
+  document.getElementById('statsRow').style.display='flex';
+  // LEAPS
+  if(d.leaps&&d.leaps.length){
+    document.getElementById('leapsList').innerHTML=d.leaps.map(lv=>`<span style="background:rgba(102,204,255,0.1);color:var(--cyan);padding:3px 8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:10px">$${lv}</span>`).join('');
+    document.getElementById('leapsWrap').style.display='block';
+  }
+  // Load chart data
+  const chartRes=await fetch(`/api/options/chart/${sym}`);
+  if(chartRes.ok){
+    const cd=await chartRes.json();
+    renderNetChart(cd.chart_data,cd.spot);
+  }
+  // Load pine
+  const pineRes=await fetch(`/api/options/pine/${sym}`);
+  if(pineRes.ok){
+    const pd=await pineRes.json();
+    document.getElementById('pineOutput').textContent=pd.pine;
+  }
+}
+
+function renderNetChart(data, spot){
+  const ctx=document.getElementById('netChart').getContext('2d');
+  if(optChart){optChart.destroy();optChart=null}
+  const strikes=data.map(d=>d.strike);
+  const nets=data.map(d=>d.netDollar);
+  const colors=nets.map(v=>v>=0?'rgba(0,204,102,0.7)':'rgba(255,68,85,0.7)');
+  const spotIdx=strikes.reduce((best,s,i)=>Math.abs(s-spot)<Math.abs(strikes[best]-spot)?i:best,0);
+  optChart=new Chart(ctx,{
+    type:'bar',
+    data:{labels:strikes,datasets:[{data:nets,backgroundColor:colors,borderWidth:0}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{
+          title:ctx=>`Strike $${ctx[0].label}`,
+          label:ctx=>{const v=ctx.raw;const abs=Math.abs(v);const fmt=abs>=1e9?`$${(abs/1e9).toFixed(2)}B`:abs>=1e6?`$${(abs/1e6).toFixed(2)}M`:abs>=1e3?`$${(abs/1e3).toFixed(1)}K`:`$${abs.toFixed(0)}`;return (v>=0?'Calls: ':'Puts: ')+fmt}
+        }},
+        annotation:{annotations:{spotLine:{type:'line',xMin:spotIdx,xMax:spotIdx,borderColor:'rgba(255,255,255,0.6)',borderWidth:2,borderDash:[5,5]}}}
+      },
+      scales:{
+        x:{ticks:{color:'rgba(122,154,184,0.6)',font:{size:8},maxTicksLimit:12,maxRotation:0},grid:{color:'rgba(30,45,61,0.4)'}},
+        y:{ticks:{color:'rgba(122,154,184,0.7)',font:{size:9},callback:v=>{const a=Math.abs(v);return a>=1e9?`$${(a/1e9).toFixed(1)}B`:a>=1e6?`$${(a/1e6).toFixed(1)}M`:a>=1e3?`$${(a/1e3).toFixed(0)}K`:'$0'}},grid:{color:'rgba(30,45,61,0.4)'}}
+      }
+    }
+  });
+}
+
+function copyPine(){
+  const text=document.getElementById('pineOutput').textContent;
+  navigator.clipboard.writeText(text).then(()=>showToast('Pine Script copied!')).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);showToast('Pine Script copied!');
+  });
+}
+
+// ── UNIVERSAL PINE ────────────────────────────────────────────────────────
+async function buildUniversalPine(){
+  if(selectedSyms.size===0){showToast('Select stocks first');return}
+  document.getElementById('univModalOverlay').classList.add('open');
+  document.getElementById('univLoading').style.display='block';
+  // Start analysis for any not yet analyzed
+  for(const sym of selectedSyms){
+    const check=await fetch(`/api/options/progress/${sym}`);
+    const state=await check.json();
+    if(state.state==='not_started'||state.state==='error'){
+      await fetch(`/api/options/start/${sym}`,{method:'POST'});
+    }
+  }
+  // Wait for all to complete
+  let allDone=false;
+  while(!allDone){
+    await new Promise(r=>setTimeout(r,2000));
+    allDone=true;
+    for(const sym of selectedSyms){
+      const check=await fetch(`/api/options/progress/${sym}`);
+      const state=await check.json();
+      if(state.state!=='done'&&state.state!=='error') allDone=false;
+    }
+    document.getElementById('univLoading').textContent=`Fetching option chains... (${[...selectedSyms].join(', ')})`;
+  }
+  // Generate
+  const res=await fetch('/api/options/pine/universal',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({symbols:[...selectedSyms]})
+  });
+  document.getElementById('univLoading').style.display='none';
+  if(res.ok){
+    const data=await res.json();
+    document.getElementById('univPineOutput').textContent=data.pine;
+  } else {
+    document.getElementById('univPineOutput').textContent='Error generating script. Make sure option data has loaded for selected stocks.';
+  }
+}
+
+function copyUnivPine(){
+  const text=document.getElementById('univPineOutput').textContent;
+  navigator.clipboard.writeText(text).then(()=>showToast('Universal Pine Script copied!')).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);showToast('Copied!');
+  });
+}
+
+// ── WATCHLIST MODAL ───────────────────────────────────────────────────────
+async function openModal(){
+  const res=await fetch('/api/watchlist');const data=await res.json();
+  document.getElementById('watchlistInput').value=data.tickers.join('\n');
+  updateCount();document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal(){document.getElementById('modalOverlay').classList.remove('open')}
+function updateCount(){
+  const t=document.getElementById('watchlistInput').value.split(/[\n,]+/).map(s=>s.trim().toUpperCase()).filter(Boolean);
+  document.getElementById('modalCount').textContent=t.length+' tickers';
+}
+async function saveWatchlist(){
+  const t=document.getElementById('watchlistInput').value.split(/[\n,]+/).map(s=>s.trim().toUpperCase()).filter(Boolean);
+  await fetch('/api/watchlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tickers:t})});
+  document.getElementById('modalCount').textContent=t.length+' tickers saved!';
+  showToast('Watchlist saved!');setTimeout(closeModal,1200);
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────
+function showToast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';
+  setTimeout(()=>t.style.display='none',2500);
+}
+document.getElementById('modalOverlay').addEventListener('click',function(e){if(e.target===this)closeModal()});
+document.getElementById('optModalOverlay').addEventListener('click',function(e){if(e.target===this)closeOptModal()});
+document.getElementById('univModalOverlay').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open')});
 </script>
 </body>
 </html>
