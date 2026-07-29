@@ -306,10 +306,34 @@ canvas{max-height:300px}
     </div>
     <!-- Net Premium Tab -->
     <div class="opt-content" id="tab-net">
-      <div class="chart-wrap"><canvas id="netChart"></canvas></div>
+      <!-- Touch-friendly crosshair readout -->
+      <div id="netReadout" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surf2);border-radius:8px;margin-bottom:8px;min-height:44px;border:1px solid var(--border)">
+        <div style="font-size:9px;color:var(--muted2);font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:0.8px;flex-shrink:0">TAP/DRAG →</div>
+        <div style="flex:1;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div>
+            <div style="font-size:8px;color:var(--muted2);font-family:'Space Mono',monospace;text-transform:uppercase">Strike</div>
+            <div id="rdStrike" style="font-size:16px;font-weight:700;font-family:'Space Mono',monospace;color:var(--text)">—</div>
+          </div>
+          <div>
+            <div style="font-size:8px;color:var(--muted2);font-family:'Space Mono',monospace;text-transform:uppercase">Net Premium</div>
+            <div id="rdNet" style="font-size:16px;font-weight:700;font-family:'Space Mono',monospace">—</div>
+          </div>
+          <div>
+            <div style="font-size:8px;color:var(--muted2);font-family:'Space Mono',monospace;text-transform:uppercase">Calls</div>
+            <div id="rdCall" style="font-size:13px;font-weight:600;font-family:'Space Mono',monospace;color:var(--green)">—</div>
+          </div>
+          <div>
+            <div style="font-size:8px;color:var(--muted2);font-family:'Space Mono',monospace;text-transform:uppercase">Puts</div>
+            <div id="rdPut" style="font-size:13px;font-weight:600;font-family:'Space Mono',monospace;color:var(--red)">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="chart-wrap" style="position:relative;touch-action:pan-y">
+        <canvas id="netChart" style="cursor:crosshair"></canvas>
+      </div>
       <div style="font-size:9px;color:var(--muted2);font-family:'Space Mono',monospace;margin-top:8px;line-height:1.8;padding:0 4px">
-        🟢 Green bar = call dominant (bulls paid here) &nbsp;|&nbsp; 🔴 Red bar = put dominant (bears paid here)<br>
-        Dashed line = current price &nbsp;|&nbsp; Taller bar = more real dollars committed at that strike
+        🟢 Green = call dominant (bulls paid here) &nbsp;|&nbsp; 🔴 Red = put dominant (bears paid here)<br>
+        Tap or drag any bar to see strike price and dollar amount above
       </div>
     </div>
     <!-- Pine Script Tab -->
@@ -586,31 +610,159 @@ async function loadOptResults(sym){
   }
 }
 
+let netChartData = [];
+
+function fmtDollar(v){
+  const a=Math.abs(v);
+  if(a>=1e9) return `$${(a/1e9).toFixed(2)}B`;
+  if(a>=1e6) return `$${(a/1e6).toFixed(2)}M`;
+  if(a>=1e3) return `$${(a/1e3).toFixed(1)}K`;
+  return `$${a.toFixed(0)}`;
+}
+
+function updateReadout(idx){
+  if(idx<0||idx>=netChartData.length) return;
+  const d=netChartData[idx];
+  const net=d.netDollar;
+  const rdNet=document.getElementById('rdNet');
+  document.getElementById('rdStrike').textContent=`$${d.strike}`;
+  rdNet.textContent=(net>=0?'+':'')+fmtDollar(net);
+  rdNet.style.color=net>=0?'var(--green)':'var(--red)';
+  document.getElementById('rdCall').textContent=fmtDollar(d.cDollar);
+  document.getElementById('rdPut').textContent=fmtDollar(d.pDollar);
+}
+
+function getBarIndexFromEvent(chart, e){
+  const rect=chart.canvas.getBoundingClientRect();
+  const x=(e.touches?e.touches[0].clientX:e.clientX)-rect.left;
+  const elements=chart.getElementsAtEventForMode({clientX:x+rect.left,clientY:rect.top+10},'index',{intersect:false},false);
+  if(elements.length) return elements[0].index;
+  // Manual fallback — find closest bar
+  const area=chart.chartArea;
+  const pct=(x-area.left)/(area.right-area.left);
+  const idx=Math.round(pct*(netChartData.length-1));
+  return Math.max(0,Math.min(idx,netChartData.length-1));
+}
+
 function renderNetChart(data, spot){
-  const ctx=document.getElementById('netChart').getContext('2d');
+  const canvas=document.getElementById('netChart');
+  const ctx=canvas.getContext('2d');
   if(optChart){optChart.destroy();optChart=null}
+  netChartData=data;
+
   const strikes=data.map(d=>d.strike);
   const nets=data.map(d=>d.netDollar);
-  const colors=nets.map(v=>v>=0?'rgba(0,204,102,0.7)':'rgba(255,68,85,0.7)');
+  const colors=nets.map(v=>v>=0?'rgba(0,224,138,0.75)':'rgba(255,61,90,0.75)');
+  const hoverColors=nets.map(v=>v>=0?'rgba(0,255,160,1)':'rgba(255,80,110,1)');
   const spotIdx=strikes.reduce((best,s,i)=>Math.abs(s-spot)<Math.abs(strikes[best]-spot)?i:best,0);
+
+  // Show spot in readout by default
+  const spotDataIdx=spotIdx;
+  setTimeout(()=>updateReadout(spotDataIdx),100);
+
   optChart=new Chart(ctx,{
     type:'bar',
-    data:{labels:strikes,datasets:[{data:nets,backgroundColor:colors,borderWidth:0}]},
+    data:{labels:strikes,datasets:[{
+      data:nets,
+      backgroundColor:colors,
+      hoverBackgroundColor:hoverColors,
+      borderWidth:0,
+    }]},
     options:{
-      responsive:true,maintainAspectRatio:false,
+      responsive:true,
+      maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
       plugins:{
         legend:{display:false},
-        tooltip:{callbacks:{
-          title:ctx=>`Strike $${ctx[0].label}`,
-          label:ctx=>{const v=ctx.raw;const abs=Math.abs(v);const fmt=abs>=1e9?`$${(abs/1e9).toFixed(2)}B`:abs>=1e6?`$${(abs/1e6).toFixed(2)}M`:abs>=1e3?`$${(abs/1e3).toFixed(1)}K`:`$${abs.toFixed(0)}`;return (v>=0?'Calls: ':'Puts: ')+fmt}
-        }},
-        annotation:{annotations:{spotLine:{type:'line',xMin:spotIdx,xMax:spotIdx,borderColor:'rgba(255,255,255,0.6)',borderWidth:2,borderDash:[5,5]}}}
+        tooltip:{
+          enabled:true,
+          mode:'index',
+          intersect:false,
+          backgroundColor:'rgba(13,17,23,0.95)',
+          borderColor:'rgba(30,45,61,0.8)',
+          borderWidth:1,
+          titleColor:'#e8f0fe',
+          bodyColor:'#7a9ab8',
+          titleFont:{family:'Space Mono',size:11},
+          bodyFont:{family:'Space Mono',size:10},
+          callbacks:{
+            title:c=>`Strike $${c[0].label}`,
+            label:c=>{
+              const v=c.raw;
+              const d=netChartData[c.dataIndex];
+              return [
+                `Net: ${v>=0?'+':''}${fmtDollar(v)}`,
+                `Calls: ${fmtDollar(d.cDollar)}`,
+                `Puts: ${fmtDollar(d.pDollar)}`,
+              ];
+            }
+          },
+          external:ctx=>{
+            // Also update the readout panel on hover
+            if(ctx.tooltip.dataPoints&&ctx.tooltip.dataPoints.length){
+              updateReadout(ctx.tooltip.dataPoints[0].dataIndex);
+            }
+          }
+        }
       },
       scales:{
-        x:{ticks:{color:'rgba(122,154,184,0.6)',font:{size:8},maxTicksLimit:12,maxRotation:0},grid:{color:'rgba(30,45,61,0.4)'}},
-        y:{ticks:{color:'rgba(122,154,184,0.7)',font:{size:9},callback:v=>{const a=Math.abs(v);return a>=1e9?`$${(a/1e9).toFixed(1)}B`:a>=1e6?`$${(a/1e6).toFixed(1)}M`:a>=1e3?`$${(a/1e3).toFixed(0)}K`:'$0'}},grid:{color:'rgba(30,45,61,0.4)'}}
-      }
+        x:{
+          ticks:{color:'rgba(122,154,184,0.6)',font:{family:'Space Mono',size:7},maxTicksLimit:10,maxRotation:0},
+          grid:{color:'rgba(30,45,61,0.3)'},
+        },
+        y:{
+          ticks:{color:'rgba(122,154,184,0.7)',font:{family:'Space Mono',size:8},
+            callback:v=>{const a=Math.abs(v);return a>=1e9?`$${(a/1e9).toFixed(1)}B`:a>=1e6?`$${(a/1e6).toFixed(1)}M`:a>=1e3?`$${(a/1e3).toFixed(0)}K`:'$0'}},
+          grid:{color:'rgba(30,45,61,0.3)'},
+        }
+      },
+      // Spot line via afterDraw plugin
+      animation:{onComplete:()=>{
+        if(!optChart) return;
+        const chart=optChart;
+        const ctx2=chart.ctx;
+        const x=chart.scales.x.getPixelForValue(spotIdx);
+        ctx2.save();
+        ctx2.strokeStyle='rgba(255,255,255,0.5)';
+        ctx2.lineWidth=2;
+        ctx2.setLineDash([4,4]);
+        ctx2.beginPath();
+        ctx2.moveTo(x,chart.chartArea.top);
+        ctx2.lineTo(x,chart.chartArea.bottom);
+        ctx2.stroke();
+        ctx2.restore();
+      }}
     }
+  });
+
+  // ── TOUCH EVENTS for mobile crosshair ──────────────────────────────────
+  const handleTouch = (e) => {
+    e.preventDefault();
+    const rect=canvas.getBoundingClientRect();
+    const touch=e.touches?e.touches[0]:e;
+    const x=touch.clientX-rect.left;
+    const area=optChart.chartArea;
+    if(x<area.left||x>area.right) return;
+    const pct=(x-area.left)/(area.right-area.left);
+    const idx=Math.round(pct*(netChartData.length-1));
+    const clamped=Math.max(0,Math.min(idx,netChartData.length-1));
+    updateReadout(clamped);
+    // Highlight bar
+    optChart.setDatasetVisibility(0,true);
+    optChart.tooltip.setActiveElements([{datasetIndex:0,index:clamped}],{x,y:rect.height/2});
+    optChart.update('none');
+  };
+
+  canvas.addEventListener('touchstart',handleTouch,{passive:false});
+  canvas.addEventListener('touchmove',handleTouch,{passive:false});
+  canvas.addEventListener('mousemove',(e)=>{
+    const rect=canvas.getBoundingClientRect();
+    const x=e.clientX-rect.left;
+    const area=optChart?.chartArea;
+    if(!area||x<area.left||x>area.right) return;
+    const pct=(x-area.left)/(area.right-area.left);
+    const idx=Math.round(pct*(netChartData.length-1));
+    updateReadout(Math.max(0,Math.min(idx,netChartData.length-1)));
   });
 }
 
