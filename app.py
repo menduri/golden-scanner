@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, Response
 import yfinance as yf
 import pandas as pd
 import json, os, io, threading
@@ -48,25 +48,17 @@ DEFAULT_WATCHLIST = [
     "WBA","WBD","WDAY","WELL","WEN","WFC","WM","WMT",
     "X","XOM","XOVR","XSD","XT","XYZ",
     "ZETA","ZIM","ZS",
-    # AI POWER & INFRASTRUCTURE
     "EQT","KMI","WMB","BE","CMI","ETN","PWR","VRT","HUBB","NVT","EMR",
-    # NUCLEAR
     "OKLO","SMR","NNE","CEG","BWXT","UUUU",
-    # COMPUTE
     "WULF","APLD",
-    # SPACE
     "RKLB","LUNR","GSAT","BKSY","SPIR","PL",
-    # AEROSPACE MATERIALS
     "AA","ATI","TECK","HXL","CRS","PKE","MTRN","QRVO","ADI","FLY",
-    # AI COMPUTE
     "AMAT","KLAC","LRCX","ALAB","ANET","AXTI","RBRK","TEM",
-    # DEFENSE
     "NOC","RCAT","DPRO","AVEX","ONDS",
-    # RESHORING
     "LAC","TMQ",
 ]
 
-# ── INDICATORS ───────────────────────────────────────────────────────────────
+# ── STAGE SCANNER ─────────────────────────────────────────────────────────────
 def ema(series, period):
     return series.ewm(span=period, adjust=False).mean()
 
@@ -94,28 +86,22 @@ def classify_ticker(sym,daily,weekly):
         if len(closes_d)<60: return None
         price=float(closes_d.iloc[-1]); prev=float(closes_d.iloc[-2])
         if math.isnan(price) or math.isnan(prev): return None
-
         tsi_d,_=calc_tsi(closes_d)
         ema7_d=ema(closes_d,7); ema21_d=ema(closes_d,21)
         sma200_d=closes_d.rolling(200).mean()
-
         tsi_val=float(tsi_d.iloc[-1]); tsi_prev=float(tsi_d.iloc[-2])
         e7=float(ema7_d.iloc[-1]); e21=float(ema21_d.iloc[-1])
         s200=float(sma200_d.iloc[-1]) if not pd.isna(sma200_d.iloc[-1]) else None
         prev_e21=float(ema21_d.iloc[-2])
-
         ab7=price>e7; ab21=price>e21
         ab200=(price>s200) if s200 else None
         prev_ab21=prev>prev_e21
         tsi_dir="↑" if tsi_val>tsi_prev else "↓"
-
         wtsi_val=None
         if weekly is not None and not weekly.empty:
             cw=weekly['Close'].dropna()
             if len(cw)>=60:
-                tw,_=calc_tsi(cw)
-                wtsi_val=float(tw.iloc[-1])
-
+                tw,_=calc_tsi(cw); wtsi_val=float(tw.iloc[-1])
         if not ab21 and not prev_ab21 and price<prev:
             sk='stage-4'; label='🔴 STAGE 4'; buy=False
             signal='Two candles below 21 EMA. Price declining. EXIT position.'
@@ -144,9 +130,7 @@ def classify_ticker(sym,daily,weekly):
             else:
                 sk='stage-2'; label='⬜ STAGE 2'; buy=False; signal='Running. Hold.'
         else:
-            sk='stage-2'; label='⬜ STAGE 2'; buy=False
-            signal='Running above 7 & 21 EMA. Hold.'
-
+            sk='stage-2'; label='⬜ STAGE 2'; buy=False; signal='Running above 7 & 21 EMA. Hold.'
         return {
             'sym':sym,'price':round(price,2),'tsi':round(tsi_val,2),
             'tsi_dir':tsi_dir,'wtsi':round(wtsi_val,2) if wtsi_val else None,
@@ -157,7 +141,7 @@ def classify_ticker(sym,daily,weekly):
 
 def tsi_zone(v):
     if v is None: return '—'
-    if v<-40: return '🔥🔥 EXTREME'
+    if v<-40: return '🔥🔥 EXTREME HOT'
     if v<-20: return '🔥 BUY ZONE'
     if v>40: return '⚠ HEAVY PROFITS'
     if v>20: return '⚠ TAKE PROFITS'
@@ -165,34 +149,45 @@ def tsi_zone(v):
     return 'NEUTRAL'
 
 # ── SCAN STATE ────────────────────────────────────────────────────────────────
-scan_state = {'running':False,'progress':0,'total':0,'current':'','results':[],'errors':[],'done':False,'date':''}
+scan_state = {'running':False,'progress':0,'total':0,'current':'',
+              'results':[],'errors':[],'done':False,'date':''}
 
 def run_scan_thread(watchlist):
     global scan_state
-    scan_state['running']=True; scan_state['done']=False
-    scan_state['results']=[]; scan_state['errors']=[]
-    scan_state['total']=len(watchlist); scan_state['progress']=0
-    scan_state['date']=date.today().strftime("%B %d, %Y")
-
+    scan_state.update({'running':True,'done':False,'results':[],'errors':[],
+                       'total':len(watchlist),'progress':0,
+                       'date':date.today().strftime("%B %d, %Y")})
     for i,sym in enumerate(watchlist):
         scan_state['current']=sym; scan_state['progress']=i+1
         data=fetch_ticker(sym)
-        if data is None:
-            scan_state['errors'].append(sym)
-            continue
+        if data is None: scan_state['errors'].append(sym); continue
         result=classify_ticker(sym,data[0],data[1])
-        if result:
-            scan_state['results'].append(result)
-        else:
-            scan_state['errors'].append(sym)
-
+        if result: scan_state['results'].append(result)
+        else: scan_state['errors'].append(sym)
     scan_state['running']=False; scan_state['done']=True
 
-# ── EXCEL BUILDER ────────────────────────────────────────────────────────────
+# ── OPTION CHAIN STATE ────────────────────────────────────────────────────────
+option_jobs = {}  # sym -> {state, result, progress}
+
+def run_option_thread(sym):
+    from option_engine import full_analysis
+    option_jobs[sym] = {'state':'running','result':None,'progress':0,'total':0,'exp':''}
+    def cb(i, total, exp):
+        option_jobs[sym]['progress'] = i
+        option_jobs[sym]['total']    = total
+        option_jobs[sym]['exp']      = exp
+    try:
+        result = full_analysis(sym, progress_cb=cb)
+        option_jobs[sym]['result'] = result
+        option_jobs[sym]['state']  = 'done'
+    except Exception as e:
+        option_jobs[sym]['state'] = 'error'
+        option_jobs[sym]['error'] = str(e)
+
+# ── EXCEL BUILDER ─────────────────────────────────────────────────────────────
 def build_excel(results, scan_date):
     def fill(c): return PatternFill("solid",start_color=c)
     def font(c,bold=False,sz=10): return Font(name="Calibri",color=c,bold=bold,size=sz)
-
     RF={'gold':fill("1C1400"),'stage-1-green':fill("0A1F0A"),'stage-1-yellow':fill("1F1A00"),
         'stage-1-blue':fill("051520"),'stage-2b':fill("120A20"),'stage-3':fill("1F0E00"),
         'stage-4':fill("1F0505"),'stage-2':fill("0D1117")}
@@ -202,21 +197,15 @@ def build_excel(results, scan_date):
     LC={'gold':"F0A500",'stage-1-green':"00CC66",'stage-1-yellow':"FFD700",
         'stage-1-blue':"66CCFF",'stage-2b':"CC88FF",'stage-3':"FF8C00",
         'stage-4':"FF4444",'stage-2':"8B949E"}
-    SN={'gold':"🥇 GOLD SETUPS — Daily Stage 1 + Weekly TSI <-20 — HIGHEST CONVICTION",
-        'stage-1-green':"🟢 STAGE 1 CONFIRMED — TSI <-20 + Candle Above 7 EMA — BUY",
-        'stage-1-yellow':"🟡 WATCHING — TSI <-20, Waiting for Candle Above 7 EMA",
-        'stage-1-blue':"🔵 STAGE 1 CONTINUATION — TSI Below 0 + Candle Above 7 EMA",
-        'stage-2b':"🟣 S2 BREAKOUT — Candle Above 21 EMA — Last Entry",
-        'stage-3':"🟠 STAGE 3 — Distribution — Consider Taking Profits",
-        'stage-4':"🔴 STAGE 4 — Decline — EXIT NOW"}
-
+    SN={'gold':"🥇 GOLD SETUPS","stage-1-green":"🟢 STAGE 1 CONFIRMED",
+        'stage-1-yellow':"🟡 WATCHING",'stage-1-blue':"🔵 STAGE 1 CONTINUATION",
+        'stage-2b':"🟣 S2 BREAKOUT",'stage-3':"🟠 STAGE 3",'stage-4':"🔴 STAGE 4 — EXIT"}
     thin=Side(style="thin",color="21262D")
     BORDER=Border(left=thin,right=thin,top=thin,bottom=thin)
     C=Alignment(horizontal="center",vertical="center")
     L=Alignment(horizontal="left",vertical="center",wrap_text=True)
     MUT=font("8B949E"); WH=font("E6EDF3"); UP=font("00CC66"); DN=font("FF4444")
     HDR=Font(name="Calibri",color="6E7681",bold=True,size=9)
-
     def tf(v):
         if v is None: return MUT
         if v<-40: return font("FF6B6B",True)
@@ -225,83 +214,53 @@ def build_excel(results, scan_date):
         if v>40: return font("FF4444",True)
         if v>20: return font("FF8C00",True)
         return font("8B949E")
-
-    def ms(p,ma): return '✓' if p and ma and p>ma else ('✗' if p and ma else '—')
-    def mf(p,ma):
-        if not p or not ma: return MUT
-        return UP if p>ma else DN
-
     HEADERS=["TICKER","PRICE","STAGE","DAILY TSI","DIR","TSI ZONE","WEEKLY TSI","7 EMA","21 EMA","200 SMA","BUY?","ACTION / SIGNAL"]
     WIDTHS=[11,9,20,11,7,18,12,8,8,10,7,58]
     ORDER={'gold':0,'stage-1-green':1,'stage-1-yellow':2,'stage-1-blue':3,'stage-2b':4,'stage-3':5,'stage-4':6,'stage-2':7}
-
     actionable=[r for r in results if r['sk']!='stage-2']
     actionable.sort(key=lambda r:(ORDER.get(r['sk'],9),r['sym']))
-
     def build_sheet(wb,title,tab_color,data,is_first=False):
         ws=wb.active if is_first else wb.create_sheet(title)
         if is_first: ws.title=title
-        ws.sheet_view.showGridLines=False
-        ws.sheet_properties.tabColor=tab_color
-
+        ws.sheet_view.showGridLines=False; ws.sheet_properties.tabColor=tab_color
         for row in ws.iter_rows(min_row=1,max_row=max(len(data)+20,30),min_col=1,max_col=12):
             for cell in row: cell.fill=fill("06080B")
-
-        ws.merge_cells("A1:L1")
-        ws["A1"]="✦ GOLDEN SCANNER — Gerald Peters Stage System"
+        ws.merge_cells("A1:L1"); ws["A1"]="✦ GOLDEN SCANNER — Gerald Peters Stage System"
         ws["A1"].font=Font(name="Calibri",bold=True,color="F0A500",size=14)
-        ws["A1"].fill=fill("0A0D12"); ws["A1"].alignment=L
-        ws.row_dimensions[1].height=28
-
+        ws["A1"].fill=fill("0A0D12"); ws["A1"].alignment=L; ws.row_dimensions[1].height=28
         ws.merge_cells("A2:L2")
-        ws["A2"]=f"TSI 25/13/8 EMA  ·  Daily + Weekly  ·  Yahoo Finance  ·  {scan_date}  ·  {len(results)} tickers"
+        ws["A2"]=f"TSI 25/13/8 EMA · Daily + Weekly · Yahoo Finance · {scan_date} · {len(results)} tickers"
         ws["A2"].font=Font(name="Calibri",color="8B949E",size=9)
-        ws["A2"].fill=fill("0A0D12"); ws["A2"].alignment=L
-        ws.row_dimensions[2].height=14
-
+        ws["A2"].fill=fill("0A0D12"); ws["A2"].alignment=L; ws.row_dimensions[2].height=14
         ws.merge_cells("A3:L3")
-        ws["A3"]="  🥇 GOLD  🟢 Stage 1  🟡 Watch  🔵 Cont.  🟣 S2 Break  🟠 Stage 3  🔴 Stage 4  ·  ↑ TSI curling up  ↓ still falling"
+        ws["A3"]="🥇 GOLD  🟢 Stage 1  🟡 Watch  🔵 Cont.  🟣 S2 Break  🟠 Stage 3  🔴 Stage 4  · ↑ curling up  ↓ falling"
         ws["A3"].font=Font(name="Calibri",color="6E7681",size=8,italic=True)
-        ws["A3"].fill=fill("0A0D12"); ws["A3"].alignment=L
-        ws.row_dimensions[3].height=13
+        ws["A3"].fill=fill("0A0D12"); ws["A3"].alignment=L; ws.row_dimensions[3].height=13
         ws.row_dimensions[4].height=5
-
         for ci,(h,w) in enumerate(zip(HEADERS,WIDTHS),1):
             cell=ws.cell(row=5,column=ci,value=h)
-            cell.font=HDR; cell.fill=fill("0D1117")
-            cell.alignment=C; cell.border=BORDER
+            cell.font=HDR; cell.fill=fill("0D1117"); cell.alignment=C; cell.border=BORDER
             ws.column_dimensions[get_column_letter(ci)].width=w
         ws.row_dimensions[5].height=20
-
         if not data:
-            ws.merge_cells("A6:L6")
-            ws["A6"]="No stocks in this category right now."
-            ws["A6"].font=font("8B949E",False,10)
-            ws["A6"].fill=fill("06080B"); ws["A6"].alignment=C
-            ws.row_dimensions[6].height=30
+            ws.merge_cells("A6:L6"); ws["A6"]="No stocks in this category right now."
+            ws["A6"].font=font("8B949E",False,10); ws["A6"].fill=fill("06080B")
+            ws["A6"].alignment=C; ws.row_dimensions[6].height=30
             ws.freeze_panes="A6"; return ws
-
         rn=6; lsk="___"; rc=0
         for r in data:
             sk=r['sk']; lc=LC.get(sk,"8B949E")
             if sk!=lsk:
-                ws.merge_cells(f"A{rn}:L{rn}")
-                ws[f"A{rn}"]=SN.get(sk,'')
+                ws.merge_cells(f"A{rn}:L{rn}"); ws[f"A{rn}"]=SN.get(sk,'')
                 ws[f"A{rn}"].font=Font(name="Calibri",bold=True,color=lc,size=9,italic=True)
                 ws[f"A{rn}"].fill=fill("0D1117"); ws[f"A{rn}"].alignment=L
-                ws.row_dimensions[rn].height=16
-                rn+=1; lsk=sk; rc=0
-
-            rf=RF.get(sk,fill("0D1117")) if rc%2==0 else RFA.get(sk,fill("161B22"))
-            rc+=1
-            p=r['price']; tsi=r['tsi']; wtsi=r['wtsi']
-            td=r.get('tsi_dir','—'); ab200=r['ab200']
-
+                ws.row_dimensions[rn].height=16; rn+=1; lsk=sk; rc=0
+            rf=RF.get(sk,fill("0D1117")) if rc%2==0 else RFA.get(sk,fill("161B22")); rc+=1
+            p=r['price']; tsi=r['tsi']; wtsi=r['wtsi']; td=r.get('tsi_dir','—'); ab200=r['ab200']
             vals=[r['sym'],f"${p:.2f}" if p else '—',r['label'],
                   f"{tsi:.2f}" if tsi is not None else '—',td,tsi_zone(tsi),
                   f"{wtsi:.2f}" if wtsi is not None else '—',
-                  ms(p,None) if r['ab7'] is None else ('✓' if r['ab7'] else '✗'),
-                  ms(p,None) if r['ab21'] is None else ('✓' if r['ab21'] else '✗'),
+                  '✓' if r['ab7'] else '✗','✓' if r['ab21'] else '✗',
                   ('✓' if ab200 else '✗') if ab200 is not None else '—',
                   '✓ BUY' if r['buy'] else '—',r['signal']]
             rfs=[Font(name="Calibri",color=lc,bold=True,size=11),WH,
@@ -311,14 +270,11 @@ def build_excel(results, scan_date):
                  (UP if ab200 else DN) if ab200 is not None else MUT,
                  Font(name="Calibri",color="00CC66",bold=True) if r['buy'] else MUT,WH]
             als=[C]*11+[L]
-
             for ci,(val,fnt,aln) in enumerate(zip(vals,rfs,als),1):
                 cell=ws.cell(row=rn,column=ci,value=val)
                 cell.font=fnt; cell.fill=rf; cell.alignment=aln; cell.border=BORDER
-            ws.row_dimensions[rn].height=18
-            rn+=1
+            ws.row_dimensions[rn].height=18; rn+=1
         ws.freeze_panes="A6"
-
     wb=Workbook()
     build_sheet(wb,"Golden Scanner","F0A500",actionable,is_first=True)
     build_sheet(wb,"⚡ ACTION REQUIRED","00CC66",[r for r in actionable if r['buy']])
@@ -326,21 +282,18 @@ def build_excel(results, scan_date):
     build_sheet(wb,"🟡 WATCHING","FFD700",[r for r in actionable if r['sk']=='stage-1-yellow'])
     build_sheet(wb,"🟠 TAKE PROFITS","FF8C00",[r for r in actionable if r['sk']=='stage-3'])
     build_sheet(wb,"🔴 EXIT NOW","FF4444",[r for r in actionable if r['sk']=='stage-4'])
-
-    buf=io.BytesIO()
-    wb.save(buf); buf.seek(0)
+    buf=io.BytesIO(); wb.save(buf); buf.seek(0)
     return buf
 
 # ── ROUTES ────────────────────────────────────────────────────────────────────
 @app.route('/')
 def index():
-    return render_template('index.html', default_watchlist=','.join(DEFAULT_WATCHLIST))
+    return render_template('index.html')
 
 @app.route('/api/scan', methods=['POST'])
 def start_scan():
     global scan_state
-    if scan_state['running']:
-        return jsonify({'error':'Scan already running'}),400
+    if scan_state['running']: return jsonify({'error':'Scan already running'}),400
     data=request.json
     watchlist=data.get('watchlist',DEFAULT_WATCHLIST)
     watchlist=[t.strip().upper() for t in watchlist if t.strip()]
@@ -353,15 +306,10 @@ def get_progress():
     s=scan_state
     counts={'gold':0,'stage-1-green':0,'stage-1-yellow':0,'stage-1-blue':0,
             'stage-2b':0,'stage-3':0,'stage-4':0,'stage-2':0}
-    for r in s['results']:
-        counts[r['sk']]=counts.get(r['sk'],0)+1
-    return jsonify({
-        'running':s['running'],'done':s['done'],
-        'progress':s['progress'],'total':s['total'],
-        'current':s['current'],'counts':counts,
-        'scanned':len(s['results']),'errors':len(s['errors']),
-        'date':s['date']
-    })
+    for r in s['results']: counts[r['sk']]=counts.get(r['sk'],0)+1
+    return jsonify({'running':s['running'],'done':s['done'],'progress':s['progress'],
+                    'total':s['total'],'current':s['current'],'counts':counts,
+                    'scanned':len(s['results']),'errors':len(s['errors']),'date':s['date']})
 
 @app.route('/api/results')
 def get_results():
@@ -372,8 +320,7 @@ def get_results():
 
 @app.route('/api/download')
 def download_excel():
-    if not scan_state['results']:
-        return jsonify({'error':'No results yet'}),400
+    if not scan_state['results']: return jsonify({'error':'No results yet'}),400
     buf=build_excel(scan_state['results'],scan_state['date'])
     filename=f"Golden_Scanner_{scan_state['date'].replace(' ','_').replace(',','')}.xlsx"
     return send_file(buf,as_attachment=True,download_name=filename,
@@ -389,9 +336,77 @@ def watchlist_api():
         return jsonify({'saved':True,'count':len(tickers)})
     if os.path.exists(wl_file):
         with open(wl_file) as f: tickers=json.load(f)
-    else:
-        tickers=DEFAULT_WATCHLIST
+    else: tickers=DEFAULT_WATCHLIST
     return jsonify({'tickers':tickers,'count':len(tickers)})
+
+# ── OPTION CHAIN ROUTES ───────────────────────────────────────────────────────
+@app.route('/api/options/start/<sym>', methods=['POST'])
+def start_option_analysis(sym):
+    sym=sym.upper()
+    if sym in option_jobs and option_jobs[sym].get('state')=='running':
+        return jsonify({'status':'already_running'})
+    t=threading.Thread(target=run_option_thread,args=(sym,))
+    t.daemon=True; t.start()
+    return jsonify({'status':'started','symbol':sym})
+
+@app.route('/api/options/progress/<sym>')
+def option_progress(sym):
+    sym=sym.upper()
+    job=option_jobs.get(sym,{})
+    return jsonify({
+        'state':    job.get('state','not_started'),
+        'progress': job.get('progress',0),
+        'total':    job.get('total',0),
+        'exp':      job.get('exp',''),
+        'error':    job.get('error',''),
+    })
+
+@app.route('/api/options/result/<sym>')
+def option_result(sym):
+    sym=sym.upper()
+    job=option_jobs.get(sym,{})
+    if job.get('state')!='done':
+        return jsonify({'state':job.get('state','not_started')}),202
+    result=job['result']
+    if not result: return jsonify({'error':'No data'}),404
+    # Don't send full chart_data here — send via separate endpoint
+    r={k:v for k,v in result.items() if k!='chart_data'}
+    r['state']='done'
+    return jsonify(r)
+
+@app.route('/api/options/chart/<sym>')
+def option_chart(sym):
+    sym=sym.upper()
+    job=option_jobs.get(sym,{})
+    if job.get('state')!='done': return jsonify({'error':'Not ready'}),202
+    result=job['result']
+    if not result: return jsonify({'error':'No data'}),404
+    return jsonify({'chart_data':result['chart_data'],'spot':result['spot']})
+
+@app.route('/api/options/pine/<sym>')
+def option_pine_single(sym):
+    sym=sym.upper()
+    job=option_jobs.get(sym,{})
+    if job.get('state')!='done': return jsonify({'error':'Not ready'}),202
+    result=job['result']
+    if not result: return jsonify({'error':'No data'}),404
+    from option_engine import generate_pine_single
+    pine=generate_pine_single(result)
+    return jsonify({'pine':pine,'symbol':sym})
+
+@app.route('/api/options/pine/universal', methods=['POST'])
+def option_pine_universal():
+    from option_engine import generate_pine_universal
+    syms=request.json.get('symbols',[])
+    analyses=[]
+    for sym in syms:
+        sym=sym.upper()
+        job=option_jobs.get(sym,{})
+        if job.get('state')=='done' and job.get('result'):
+            analyses.append(job['result'])
+    if not analyses: return jsonify({'error':'No analyzed symbols ready'}),400
+    pine=generate_pine_universal(analyses)
+    return jsonify({'pine':pine,'count':len(analyses)})
 
 if __name__=='__main__':
     app.run(debug=True,host='0.0.0.0',port=5000)
