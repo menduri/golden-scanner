@@ -440,7 +440,12 @@ def generate_pine_universal(analyses):
         blocks.append(block)
 
     tickers = " | ".join([a["symbol"] for a in analyses])
-    all_zones = f"    // Zone size varies per ticker — using average\n    zoneSize = {analyses[0]['zone'] if analyses else 1.0}"
+
+    # Build dynamic zoneSize lookup — each ticker gets its correct zone
+    zone_lookup = " : ".join([
+        f'syminfo.ticker == "{a["symbol"]}" ? {a["zone"]}'
+        for a in analyses
+    ]) + f' : {analyses[0]["zone"] if analyses else 1.0}'
 
     return f"""//@version=6
 indicator("Chain Reader Pro -- Universal | {tickers}", overlay=true, max_lines_count=500, max_labels_count=500)
@@ -456,7 +461,7 @@ fill_gamma = color.new(#00d4e8, 58)
 fill_pain  = color.new(#f5a623, 60)
 fill_leaps = color.new(#3d8bff, 62)
 
-zoneSize = 1.0
+zoneSize = {zone_lookup}
 
 drawZone(p, col, fc, txt, ls) =>
     top    = p + zoneSize / 2
