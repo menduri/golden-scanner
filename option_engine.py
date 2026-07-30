@@ -150,15 +150,16 @@ def calc_gamma_flip(records, spot):
     return spot
 
 def calc_max_pain(records, spot):
-    candidates = [r for r in records
-                  if (r["cOI"]+r["pOI"]) > 100
-                  and spot*0.5 <= r["strike"] <= spot*1.5]
+    # Use ALL strikes with meaningful OI — cross-expiration aggregated
+    # No price range filter — institutions hold OI at all strikes
+    candidates = [r for r in records if (r["cOI"] + r["pOI"]) > 50]
     if not candidates:
         return spot
     best_strike = spot
     best_loss = float("inf")
     for cand in candidates:
         cs = cand["strike"]
+        # Sum loss across ALL strikes — this is the true max pain calculation
         loss = sum(
             r["cOI"] * max(0, r["strike"] - cs) +
             r["pOI"] * max(0, cs - r["strike"])
@@ -313,48 +314,63 @@ def full_analysis(symbol, progress_cb=None):
 
 # ── PINE SCRIPT GENERATOR ─────────────────────────────────────────────────────
 def generate_pine_single(a):
-    sym  = a["symbol"]
-    zone = a["zone"]
-    spot = a["spot"]
-    score = a["score"]
+    sym       = a["symbol"]
+    zone      = a["zone"]
+    spot      = a["spot"]
+    score     = a["score"]
     label_txt = a["label"]
 
     def pct(level):
         diff = ((level - spot) / spot) * 100
-        sign = "+" if diff >= 0 else ""
-        return f"{sign}{diff:.1f}%"
+        return f"+{diff:.1f}%" if diff >= 0 else f"{diff:.1f}%"
 
-    def bull_or_bear(level):
-        return "bull target" if level >= spot else "below"
+    def fmt_d(v):
+        v = v or 0
+        if v >= 1e9: return f"${v/1e9:.1f}B"
+        if v >= 1e6: return f"${v/1e6:.1f}M"
+        if v >= 1e3: return f"${v/1e3:.0f}K"
+        return f"${v:.0f}"
+
+    # Dollar lookup from chart_data
+    dollar_map = {d["strike"]: d for d in a.get("chart_data", [])}
+
+    def call_d(lv):
+        d = dollar_map.get(lv) or dollar_map.get(round(lv,2)) or {}
+        return fmt_d(d.get("cDollar", 0))
+
+    def put_d(lv):
+        d = dollar_map.get(lv) or dollar_map.get(round(lv,2)) or {}
+        return fmt_d(d.get("pDollar", 0))
 
     gf_regime = "POS GAMMA" if spot > a["gf"] else "NEG GAMMA"
     mp_sign   = "+" if a["mp"] >= spot else ""
     mp_pct    = f"{mp_sign}{((a['mp']-spot)/spot*100):.1f}%"
 
-    # Resistance lines (dashed, call color)
+    cw_d = call_d(a["cw"])
+    pw_d = put_d(a["pw"])
+
     resist_lines = "\n".join([
-        f'    drawZone({lv:.2f}, col_call, fill_call, "Resistance ${lv:.2f} -- {pct(lv)} above", line.style_dashed)'
+        f'    drawZone({lv:.2f}, col_call, fill_call, "Resistance ${lv:.2f} -- {call_d(lv)} -- {pct(lv)} above", line.style_dashed)'
         for lv in a["resistance"]
     ])
-
-    # Support lines (dotted, put color)
     support_lines = "\n".join([
-        f'    drawZone({lv:.2f}, col_put, fill_put, "Support ${lv:.2f} -- {pct(lv)} below", line.style_dotted)'
+        f'    drawZone({lv:.2f}, col_put, fill_put, "Support ${lv:.2f} -- {put_d(lv)} -- {pct(lv)} below", line.style_dotted)'
         for lv in a["support"]
     ])
-
-    # LEAPS lines (dotted, leaps color)
     leaps_lines = "\n".join([
-        f'    drawZone({lv:.2f}, col_leaps, fill_leaps, "LEAPS ${lv:.2f} -- {pct(lv)} bull target", line.style_dotted)'
+        f'    drawZone({lv:.2f}, col_leaps, fill_leaps, "LEAPS ${lv:.2f} -- {call_d(lv)} bull target", line.style_dotted)'
         for lv in a["leaps"]
     ])
 
-    resist_block  = f"    // Resistance levels\n{resist_lines}"  if resist_lines.strip()  else ""
-    support_block = f"    // Support levels\n{support_lines}"    if support_lines.strip() else ""
-    leaps_block   = f"    // LEAPS targets\n{leaps_lines}"       if leaps_lines.strip()   else ""
+    resist_block  = f"    // Resistance\n{resist_lines}"  if resist_lines.strip()  else ""
+    support_block = f"    // Support\n{support_lines}"    if support_lines.strip() else ""
+    leaps_block   = f"    // LEAPS\n{leaps_lines}"        if leaps_lines.strip()   else ""
 
     return f"""//@version=6
 indicator("Chain Reader Pro -- {sym} Levels | {score}/10 {label_txt}", overlay=true, max_lines_count=500, max_labels_count=500)
+
+// {sym} | Spot: ${spot} | GF: ${a['gf']:.2f} | MP: ${a['mp']:.2f} | CW: ${a['cw']:.2f} | PW: ${a['pw']:.2f}
+// Score: {score}/10 {label_txt} | P/C: {a['pc_ratio']} | Net Premium: {a['net_total_fmt']}
 
 col_call  = color.new(#00e08a, 0)
 col_put   = color.new(#ff3d5a, 0)
@@ -377,15 +393,15 @@ drawZone(p, col, fc, txt, ls) =>
     linefill.new(tl, bl, fc)
     label.new(bar_index + 8, top, "  " + txt + "  ", color=col, textcolor=color.white, style=label.style_label_left, size=size.normal, yloc=yloc.price)
 
-if barstate.islast and syminfo.ticker == "{sym}"
+if barstate.islast
     // Gamma Flip
     drawZone({a['gf']:.2f}, col_gamma, fill_gamma, "GAMMA FLIP ${a['gf']:.2f} -- {gf_regime} | {score}/10 {label_txt}", line.style_solid)
     // Max Pain
     drawZone({a['mp']:.2f}, col_pain, fill_pain, "MAX PAIN ${a['mp']:.2f} -- {label_txt} {mp_pct}", line.style_dashed)
     // Call Wall
-    drawZone({a['cw']:.2f}, col_call, fill_call, "CALL WALL ${a['cw']:.2f} -- {pct(a['cw'])} above", line.style_solid)
+    drawZone({a['cw']:.2f}, col_call, fill_call, "CALL WALL ${a['cw']:.2f} -- {cw_d}", line.style_solid)
     // Put Wall
-    drawZone({a['pw']:.2f}, col_put, fill_put, "PUT WALL ${a['pw']:.2f} -- {pct(a['pw'])} below", line.style_solid)
+    drawZone({a['pw']:.2f}, col_put, fill_put, "PUT WALL ${a['pw']:.2f} -- {pw_d}", line.style_solid)
 {resist_block}
 {support_block}
 {leaps_block}
@@ -395,31 +411,49 @@ if barstate.islast and syminfo.ticker == "{sym}"
 def generate_pine_universal(analyses):
     blocks = []
     for a in analyses:
-        sym   = a["symbol"]
-        zone  = a["zone"]
-        spot  = a["spot"]
-        score = a["score"]
+        sym       = a["symbol"]
+        zone      = a["zone"]
+        spot      = a["spot"]
+        score     = a["score"]
         label_txt = a["label"]
 
         def pct(level):
             diff = ((level - spot) / spot) * 100
-            sign = "+" if diff >= 0 else ""
-            return f"{sign}{diff:.1f}%"
+            return f"+{diff:.1f}%" if diff >= 0 else f"{diff:.1f}%"
+
+        def fmt_d(v):
+            v = v or 0
+            if v >= 1e9: return f"${v/1e9:.1f}B"
+            if v >= 1e6: return f"${v/1e6:.1f}M"
+            if v >= 1e3: return f"${v/1e3:.0f}K"
+            return f"${v:.0f}"
+
+        dollar_map = {d["strike"]: d for d in a.get("chart_data", [])}
+
+        def call_d(lv):
+            d = dollar_map.get(lv) or dollar_map.get(round(lv,2)) or {}
+            return fmt_d(d.get("cDollar", 0))
+
+        def put_d(lv):
+            d = dollar_map.get(lv) or dollar_map.get(round(lv,2)) or {}
+            return fmt_d(d.get("pDollar", 0))
 
         gf_regime = "POS GAMMA" if spot > a["gf"] else "NEG GAMMA"
         mp_sign   = "+" if a["mp"] >= spot else ""
         mp_pct    = f"{mp_sign}{((a['mp']-spot)/spot*100):.1f}%"
+        cw_d = call_d(a["cw"])
+        pw_d = put_d(a["pw"])
 
         resist_lines = "\n".join([
-            f'        drawZone({lv:.2f}, col_call, fill_call, "Resistance ${lv:.2f} -- {pct(lv)} above", line.style_dashed)'
+            f'        drawZone({lv:.2f}, col_call, fill_call, "Resistance ${lv:.2f} -- {call_d(lv)} -- {pct(lv)} above", line.style_dashed)'
             for lv in a["resistance"]
         ])
         support_lines = "\n".join([
-            f'        drawZone({lv:.2f}, col_put, fill_put, "Support ${lv:.2f} -- {pct(lv)} below", line.style_dotted)'
+            f'        drawZone({lv:.2f}, col_put, fill_put, "Support ${lv:.2f} -- {put_d(lv)} -- {pct(lv)} below", line.style_dotted)'
             for lv in a["support"]
         ])
         leaps_lines = "\n".join([
-            f'        drawZone({lv:.2f}, col_leaps, fill_leaps, "LEAPS ${lv:.2f} -- {pct(lv)} bull target", line.style_dotted)'
+            f'        drawZone({lv:.2f}, col_leaps, fill_leaps, "LEAPS ${lv:.2f} -- {call_d(lv)} bull target", line.style_dotted)'
             for lv in a["leaps"]
         ])
 
@@ -428,20 +462,18 @@ def generate_pine_universal(analyses):
         leaps_block   = f"        // LEAPS\n{leaps_lines}"        if leaps_lines.strip()   else ""
 
         block = f"""
-    // ── {sym} | {score}/10 {label_txt} ──
+    // ── {sym} | {score}/10 {label_txt} | GF:{a['gf']:.2f} MP:{a['mp']:.2f} CW:{a['cw']:.2f} PW:{a['pw']:.2f} ──
     if syminfo.ticker == "{sym}"
         drawZone({a['gf']:.2f}, col_gamma, fill_gamma, "GAMMA FLIP ${a['gf']:.2f} -- {gf_regime} | {score}/10 {label_txt}", line.style_solid)
         drawZone({a['mp']:.2f}, col_pain, fill_pain, "MAX PAIN ${a['mp']:.2f} -- {label_txt} {mp_pct}", line.style_dashed)
-        drawZone({a['cw']:.2f}, col_call, fill_call, "CALL WALL ${a['cw']:.2f} -- {pct(a['cw'])} above", line.style_solid)
-        drawZone({a['pw']:.2f}, col_put, fill_put, "PUT WALL ${a['pw']:.2f} -- {pct(a['pw'])} below", line.style_solid)
+        drawZone({a['cw']:.2f}, col_call, fill_call, "CALL WALL ${a['cw']:.2f} -- {cw_d}", line.style_solid)
+        drawZone({a['pw']:.2f}, col_put, fill_put, "PUT WALL ${a['pw']:.2f} -- {pw_d}", line.style_solid)
 {resist_block}
 {support_block}
 {leaps_block}"""
         blocks.append(block)
 
-    tickers = " | ".join([a["symbol"] for a in analyses])
-
-    # Build dynamic zoneSize lookup — each ticker gets its correct zone
+    tickers   = " | ".join([a["symbol"] for a in analyses])
     zone_lookup = " : ".join([
         f'syminfo.ticker == "{a["symbol"]}" ? {a["zone"]}'
         for a in analyses
