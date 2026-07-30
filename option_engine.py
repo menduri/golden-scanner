@@ -150,16 +150,16 @@ def calc_gamma_flip(records, spot):
     return spot
 
 def calc_max_pain(records, spot):
-    # Use ALL strikes with meaningful OI — cross-expiration aggregated
-    # No price range filter — institutions hold OI at all strikes
-    candidates = [r for r in records if (r["cOI"] + r["pOI"]) > 50]
+    # TRUE Max Pain: aggregate ALL OI across ALL expirations per strike
+    # No OI threshold filter — every strike counts
+    # No price range filter — every strike contributes to loss calculation
+    candidates = [r for r in records if (r["cOI"] + r["pOI"]) > 0]
     if not candidates:
         return spot
     best_strike = spot
     best_loss = float("inf")
     for cand in candidates:
         cs = cand["strike"]
-        # Sum loss across ALL strikes — this is the true max pain calculation
         loss = sum(
             r["cOI"] * max(0, r["strike"] - cs) +
             r["pOI"] * max(0, cs - r["strike"])
@@ -463,7 +463,7 @@ def generate_pine_universal(analyses):
 
         block = f"""
     // ── {sym} | {score}/10 {label_txt} | GF:{a['gf']:.2f} MP:{a['mp']:.2f} CW:{a['cw']:.2f} PW:{a['pw']:.2f} ──
-    if syminfo.ticker == "{sym}"
+    if t == "{sym}"
         drawZone({a['gf']:.2f}, col_gamma, fill_gamma, "GAMMA FLIP ${a['gf']:.2f} -- {gf_regime} | {score}/10 {label_txt}", line.style_solid)
         drawZone({a['mp']:.2f}, col_pain, fill_pain, "MAX PAIN ${a['mp']:.2f} -- {label_txt} {mp_pct}", line.style_dashed)
         drawZone({a['cw']:.2f}, col_call, fill_call, "CALL WALL ${a['cw']:.2f} -- {cw_d}", line.style_solid)
@@ -475,12 +475,35 @@ def generate_pine_universal(analyses):
 
     tickers   = " | ".join([a["symbol"] for a in analyses])
     zone_lookup = " : ".join([
-        f'syminfo.ticker == "{a["symbol"]}" ? {a["zone"]}'
+        f't == "{a["symbol"]}" ? {a["zone"]}'
         for a in analyses
     ]) + f' : {analyses[0]["zone"] if analyses else 1.0}'
 
+    tickers   = " | ".join([a["symbol"] for a in analyses])
+    zone_lookup = " : ".join([
+        f't == "{a["symbol"]}" ? {a["zone"]}'
+        for a in analyses
+    ]) + f' : {analyses[0]["zone"] if analyses else 1.0}'
+
+    # Build else if chain — critical for correct routing
+    first = True
+    chained_blocks = []
+    for block in blocks:
+        if first:
+            chained_blocks.append(block)
+            first = False
+        else:
+            # Replace leading newline + 4spaces + "if syminfo" with "else if syminfo"  
+            block = block.replace('\n    if syminfo.ticker', '\n    else if t ==', 1)
+            block = block.replace('    if syminfo.ticker == ', '    if t == ', 1)
+            chained_blocks.append(block)
+
+    # Fix first block too
+    if chained_blocks:
+        chained_blocks[0] = chained_blocks[0].replace('    if syminfo.ticker == ', '    if t == ', 1)
+
     return f"""//@version=6
-indicator("Chain Reader Pro -- Universal | {tickers}", overlay=true, max_lines_count=500, max_labels_count=500)
+indicator("Chain Reader Pro -- Universal Levels", overlay=true, max_lines_count=500, max_labels_count=500)
 
 col_call  = color.new(#00e08a, 0)
 col_put   = color.new(#ff3d5a, 0)
@@ -493,6 +516,8 @@ fill_gamma = color.new(#00d4e8, 58)
 fill_pain  = color.new(#f5a623, 60)
 fill_leaps = color.new(#3d8bff, 62)
 
+t = syminfo.ticker
+
 zoneSize = {zone_lookup}
 
 drawZone(p, col, fc, txt, ls) =>
@@ -504,5 +529,6 @@ drawZone(p, col, fc, txt, ls) =>
     label.new(bar_index + 8, top, "  " + txt + "  ", color=col, textcolor=color.white, style=label.style_label_left, size=size.normal, yloc=yloc.price)
 
 if barstate.islast
-{"".join(blocks)}
+{"".join(chained_blocks)}
 """
+
