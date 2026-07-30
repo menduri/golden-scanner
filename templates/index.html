@@ -409,6 +409,7 @@ function renderCard(r){
       <button class="act-btn chart-btn" onclick="openOptionModal('${r.sym}','chart')">📊 CHART</button>
       <button class="act-btn net-btn" onclick="openOptionModal('${r.sym}','net')">💰 NET PREMIUM</button>
       <button class="act-btn pine-btn" onclick="openOptionModal('${r.sym}','pine')">📋 PINE SCRIPT</button>
+      <button class="act-btn" style="color:var(--gold);border-color:var(--border)" onclick="exportChain('${r.sym}',this)">📥 CHAIN</button>
     </div>
   </div>`;
 }
@@ -838,6 +839,33 @@ async function saveWatchlist(){
 }
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
+async function exportChain(sym, btn){
+  const orig = btn.textContent;
+  btn.textContent = '⏳ FETCHING...';
+  btn.disabled = true;
+  btn.style.color = 'var(--gold)';
+  showToast(`Fetching full chain for ${sym} — this takes 2-5 min...`);
+  try {
+    const res = await fetch(`/api/options/export/${sym}`);
+    if(!res.ok){ showToast('Error fetching chain'); return; }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `${sym}_OptionChain.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`${sym} chain downloaded!`);
+  } catch(e) {
+    showToast('Download failed — try again');
+  } finally {
+    btn.textContent = orig;
+    btn.disabled = false;
+  }
+}
+
 function showToast(msg){
   const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';
   setTimeout(()=>t.style.display='none',2500);
