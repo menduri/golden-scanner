@@ -408,5 +408,213 @@ def option_pine_universal():
     pine=generate_pine_universal(analyses)
     return jsonify({'pine':pine,'count':len(analyses)})
 
+@app.route('/api/options/export/<sym>')
+def export_chain(sym):
+    """Export full option chain — ALL expirations, ALL strikes, ALL greeks to Excel"""
+    import requests as req, time as t
+    from datetime import date, datetime
+    sym = sym.upper()
+
+    TRADIER_TOKEN = "Vzj4eByTvakHHT4PLg4jl6AjtfZs"
+    BASE  = "https://api.tradier.com/v1"
+    HDR   = {"Authorization": f"Bearer {TRADIER_TOKEN}", "Accept": "application/json"}
+
+    def fill(c): return PatternFill("solid", start_color=c)
+    def font(c, bold=False, sz=9): return Font(name="Calibri", color=c, bold=bold, size=sz)
+
+    try:
+        # Spot price
+        r = req.get(f"{BASE}/markets/quotes", params={"symbols": sym}, headers=HDR, timeout=10)
+        q = r.json()["quotes"]["quote"]
+        spot = float(q.get("last") or q.get("close") or 0)
+
+        # All expirations
+        r = req.get(f"{BASE}/markets/options/expirations",
+                    params={"symbol": sym, "includeAllRoots": "true"},
+                    headers=HDR, timeout=10)
+        exps = r.json()["expirations"]["date"]
+        if isinstance(exps, str): exps = [exps]
+
+        wb = Workbook()
+        wb.remove(wb.active)
+
+        # ── SUMMARY SHEET ──────────────────────────────────────────────────
+        ws_sum = wb.create_sheet("SUMMARY", 0)
+        ws_sum.sheet_properties.tabColor = "F0A500"
+        ws_sum.sheet_view.showGridLines = False
+
+        for row in ws_sum.iter_rows(min_row=1, max_row=len(exps)+10, min_col=1, max_col=10):
+            for cell in row: cell.fill = fill("06080B")
+
+        ws_sum.merge_cells("A1:J1")
+        ws_sum.cell(1,1, f"✦ {sym} — Full Option Chain Export | Spot: ${spot:.2f} | {datetime.now().strftime('%Y-%m-%d %H:%M')} | All Expirations")
+        ws_sum.cell(1,1).font = Font(name="Calibri", bold=True, color="F0A500", size=13)
+        ws_sum.cell(1,1).fill = fill("0A0D12")
+        ws_sum.row_dimensions[1].height = 24
+
+        sum_hdrs = ["EXPIRATION","DAYS OUT","TOTAL STRIKES","CALLS","PUTS","TOTAL OI","CALL OI","PUT OI","AVG IV","NET DELTA"]
+        sum_widths = [14,10,14,10,10,12,10,10,10,12]
+        for ci,(h,w) in enumerate(zip(sum_hdrs,sum_widths),1):
+            cell = ws_sum.cell(3, ci, h)
+            cell.font = Font(name="Calibri", bold=True, color="6E7681", size=8)
+            cell.fill = fill("0D1117")
+            from openpyxl.utils import get_column_letter
+            ws_sum.column_dimensions[get_column_letter(ci)].width = w
+        ws_sum.row_dimensions[3].height = 18
+
+        sum_row = 4
+
+        # ── PER EXPIRATION ──────────────────────────────────────────────────
+        for exp in exps:
+            try:
+                r2 = req.get(f"{BASE}/markets/options/chains",
+                             params={"symbol": sym, "expiration": exp, "greeks": "true"},
+                             headers=HDR, timeout=15)
+                data = r2.json().get("options", {})
+                t.sleep(0.1)
+
+                if not data or not data.get("option"):
+                    continue
+
+                opts = data["option"]
+                if isinstance(opts, dict): opts = [opts]
+
+                # Sort by strike then type
+                opts_sorted = sorted(opts, key=lambda o: (
+                    float(o.get("strike", 0)),
+                    0 if o.get("option_type","").lower()=="call" else 1
+                ))
+
+                calls = [o for o in opts_sorted if o.get("option_type","").lower()=="call"]
+                puts  = [o for o in opts_sorted if o.get("option_type","").lower()=="put"]
+                strikes = sorted(set(float(o.get("strike",0)) for o in opts_sorted))
+
+                total_oi   = sum(int(o.get("open_interest") or 0) for o in opts_sorted)
+                call_oi    = sum(int(o.get("open_interest") or 0) for o in calls)
+                put_oi     = sum(int(o.get("open_interest") or 0) for o in puts)
+                ivs        = [float(o.get("greeks",{}).get("mid_iv",0) or 0) for o in opts_sorted if o.get("greeks")]
+                avg_iv     = round(sum(ivs)/len(ivs),4) if ivs else 0
+                deltas     = [float(o.get("greeks",{}).get("delta",0) or 0) for o in opts_sorted if o.get("greeks")]
+                net_delta  = round(sum(deltas),2)
+
+                try:
+                    exp_d = date.fromisoformat(exp)
+                    days_out = (exp_d - date.today()).days
+                except:
+                    days_out = "?"
+
+                # Summary row
+                sum_vals = [exp, days_out, len(strikes), len(calls), len(puts),
+                            total_oi, call_oi, put_oi, avg_iv, net_delta]
+                for ci, val in enumerate(sum_vals, 1):
+                    cell = ws_sum.cell(sum_row, ci, val)
+                    cell.font = font("E6EDF3")
+                    cell.fill = fill("0D1117") if sum_row%2==0 else fill("141A22")
+                ws_sum.row_dimensions[sum_row].height = 16
+                sum_row += 1
+
+                # Per-expiration sheet
+                ws = wb.create_sheet(exp[:31])
+                ws.sheet_view.showGridLines = False
+
+                for row in ws.iter_rows(min_row=1, max_row=len(opts_sorted)+5, min_col=1, max_col=18):
+                    for cell in row: cell.fill = fill("06080B")
+
+                # Title
+                ws.merge_cells("A1:R1")
+                ws.cell(1,1, f"{sym} | {exp} | {days_out} days | Spot: ${spot:.2f} | {len(strikes)} strikes | OI: {total_oi:,}")
+                ws.cell(1,1).font = Font(name="Calibri", bold=True, color="F0A500", size=11)
+                ws.cell(1,1).fill = fill("0A0D12")
+                ws.row_dimensions[1].height = 20
+
+                # Column headers
+                hdrs = ["TYPE","STRIKE","LAST","BID","ASK","MID","VOLUME","OI",
+                        "DELTA","GAMMA","THETA","VEGA","RHO","IV (MID)","IV (BID)","IV (ASK)","INTRINSIC","TIME VAL"]
+                widths = [6,10,8,8,8,8,10,10,8,8,8,8,7,10,10,10,10,10]
+                for ci,(h,w) in enumerate(zip(hdrs,widths),1):
+                    cell = ws.cell(2, ci, h)
+                    cell.font = Font(name="Calibri", bold=True, color="6E7681", size=8)
+                    cell.fill = fill("0D1117")
+                    from openpyxl.utils import get_column_letter
+                    ws.column_dimensions[get_column_letter(ci)].width = w
+                ws.row_dimensions[2].height = 16
+
+                row_num = 3
+                for o in opts_sorted:
+                    try:
+                        strike = float(o.get("strike",0))
+                        otype  = o.get("option_type","").upper()
+                        g      = o.get("greeks") or {}
+                        is_call = otype == "CALL"
+                        atm = abs(strike - spot) / spot < 0.02
+
+                        if atm:
+                            bg = "1A2E1A" if is_call else "2E1A1A"
+                        elif is_call:
+                            bg = "0A1A0A" if row_num%2==0 else "0D200D"
+                        else:
+                            bg = "1A0A0A" if row_num%2==0 else "200D0D"
+
+                        txt_color = "00CC66" if is_call else "FF4455"
+                        if atm: txt_color = "00FF88" if is_call else "FF6677"
+
+                        def sf(key, dec=2):
+                            v = o.get(key) if key in o else g.get(key)
+                            if v is None or v == "": return ""
+                            try: return round(float(v), dec)
+                            except: return ""
+
+                        last = sf("last"); bid = sf("bid"); ask = sf("ask")
+                        mid  = round((float(bid or 0)+float(ask or 0))/2, 2) if bid and ask else ""
+
+                        # Intrinsic value
+                        if is_call:
+                            intrinsic = max(0, spot - strike)
+                        else:
+                            intrinsic = max(0, strike - spot)
+                        intrinsic = round(intrinsic, 2)
+                        time_val  = round(float(last or 0) - intrinsic, 2) if last else ""
+
+                        row_data = [
+                            otype, strike,
+                            sf("last"), sf("bid"), sf("ask"), mid,
+                            sf("volume",0), sf("open_interest",0),
+                            sf("delta",4) if "delta" in g else "",
+                            sf("gamma",5) if "gamma" in g else "",
+                            sf("theta",4) if "theta" in g else "",
+                            sf("vega",4)  if "vega"  in g else "",
+                            sf("rho",4)   if "rho"   in g else "",
+                            sf("mid_iv",4)   if "mid_iv"   in g else "",
+                            sf("bid_iv",4)   if "bid_iv"   in g else "",
+                            sf("ask_iv",4)   if "ask_iv"   in g else "",
+                            intrinsic, time_val,
+                        ]
+                        rf = fill(bg)
+                        for ci, val in enumerate(row_data, 1):
+                            cell = ws.cell(row_num, ci, val)
+                            cell.font = Font(name="Calibri", color=txt_color, size=9)
+                            cell.fill = rf
+                        ws.row_dimensions[row_num].height = 14
+                        row_num += 1
+                    except:
+                        continue
+
+                ws.freeze_panes = "A3"
+
+            except Exception as e:
+                continue
+
+        # Save to buffer
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        filename = f"{sym}_OptionChain_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+        return send_file(buf, as_attachment=True, download_name=filename,
+                         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__=='__main__':
     app.run(debug=True,host='0.0.0.0',port=5000)
