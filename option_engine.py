@@ -486,21 +486,15 @@ def generate_pine_universal(analyses):
     ]) + f' : {analyses[0]["zone"] if analyses else 1.0}'
 
     # Build else if chain — critical for correct routing
-    first = True
+    # First block uses "if t ==", subsequent blocks use "else if t =="
     chained_blocks = []
-    for block in blocks:
-        if first:
+    for i, block in enumerate(blocks):
+        if i == 0:
             chained_blocks.append(block)
-            first = False
         else:
-            # Replace leading newline + 4spaces + "if syminfo" with "else if syminfo"  
-            block = block.replace('\n    if syminfo.ticker', '\n    else if t ==', 1)
-            block = block.replace('    if syminfo.ticker == ', '    if t == ', 1)
+            # Change "    if t ==" to "    else if t ==" for 2nd+ blocks
+            block = block.replace('\n    if t == ', '\n    else if t == ', 1)
             chained_blocks.append(block)
-
-    # Fix first block too
-    if chained_blocks:
-        chained_blocks[0] = chained_blocks[0].replace('    if syminfo.ticker == ', '    if t == ', 1)
 
     return f"""//@version=6
 indicator("Chain Reader Pro -- Universal Levels", overlay=true, max_lines_count=500, max_labels_count=500)
