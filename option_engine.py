@@ -396,8 +396,6 @@ drawZone(p, col, fc, txt, ls) =>
 if barstate.islast and syminfo.ticker == "{sym}"
     // Gamma Flip
     drawZone({a['gf']:.2f}, col_gamma, fill_gamma, "GAMMA FLIP ${a['gf']:.2f} -- {gf_regime} | {score}/10 {label_txt}", line.style_solid)
-    // Max Pain
-    drawZone({a['mp']:.2f}, col_pain, fill_pain, "MAX PAIN ${a['mp']:.2f} -- {label_txt} {mp_pct}", line.style_dashed)
     // Call Wall
     drawZone({a['cw']:.2f}, col_call, fill_call, "CALL WALL ${a['cw']:.2f} -- {cw_d}", line.style_solid)
     // Put Wall
@@ -405,6 +403,10 @@ if barstate.islast and syminfo.ticker == "{sym}"
 {resist_block}
 {support_block}
 {leaps_block}
+    // Max Pain — drawn LAST, always visible
+    drawZone({a['mp']:.2f}, col_pain, fill_pain, "MAX PAIN ${a['mp']:.2f} -- {label_txt} {mp_pct}", line.style_dashed)
+    // Extra Max Pain label offset right so it always shows even when overlapping
+    label.new(bar_index + 30, {a['mp']:.2f}, "  ★ MAX PAIN ${a['mp']:.2f}  ", color=col_pain, textcolor=color.black, style=label.style_label_left, size=size.normal, yloc=yloc.price)
 """
 
 
@@ -465,12 +467,15 @@ def generate_pine_universal(analyses):
     // ── {sym} | {score}/10 {label_txt} | GF:{a['gf']:.2f} MP:{a['mp']:.2f} CW:{a['cw']:.2f} PW:{a['pw']:.2f} ──
     if t == "{sym}"
         drawZone({a['gf']:.2f}, col_gamma, fill_gamma, "GAMMA FLIP ${a['gf']:.2f} -- {gf_regime} | {score}/10 {label_txt}", line.style_solid)
-        drawZone({a['mp']:.2f}, col_pain, fill_pain, "MAX PAIN ${a['mp']:.2f} -- {label_txt} {mp_pct}", line.style_dashed)
         drawZone({a['cw']:.2f}, col_call, fill_call, "CALL WALL ${a['cw']:.2f} -- {cw_d}", line.style_solid)
         drawZone({a['pw']:.2f}, col_put, fill_put, "PUT WALL ${a['pw']:.2f} -- {pw_d}", line.style_solid)
 {resist_block}
 {support_block}
-{leaps_block}"""
+{leaps_block}
+        // Max Pain — drawn LAST, always visible
+        drawZone({a['mp']:.2f}, col_pain, fill_pain, "MAX PAIN ${a['mp']:.2f} -- {label_txt} {mp_pct}", line.style_dashed)
+        // Extra Max Pain label offset right so it always shows even when overlapping
+        label.new(bar_index + 30, {a['mp']:.2f}, "  ★ MAX PAIN ${a['mp']:.2f}  ", color=col_pain, textcolor=color.black, style=label.style_label_left, size=size.normal, yloc=yloc.price)"""
         blocks.append(block)
 
     tickers   = " | ".join([a["symbol"] for a in analyses])
