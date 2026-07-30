@@ -117,14 +117,6 @@ body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-ser
 .w-star{color:var(--gold);margin-left:auto;font-size:9px}
 .card-signal{font-size:10px;color:var(--muted2);line-height:1.5;border-top:1px solid var(--border);padding-top:7px;margin-bottom:9px}
 .card-signal strong{color:var(--text)}
-/* SCORE BADGE */
-.score-badge{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:6px;margin-bottom:8px;background:var(--surf2);border:1px solid var(--border)}
-.score-badge-num{font-size:15px;font-weight:700;font-family:'Space Mono',monospace}
-.score-badge-label{font-size:9px;font-weight:600;font-family:'Space Mono',monospace;letter-spacing:0.5px;text-transform:uppercase}
-.score-badge-bar{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
-.score-badge-fill{height:100%;border-radius:2px;transition:width 0.6s ease}
-.score-badge-gf{font-size:9px;color:var(--muted2);font-family:'Space Mono',monospace;margin-left:auto;white-space:nowrap}
-.score-loading{font-size:9px;color:var(--muted2);font-family:'Space Mono',monospace;padding:4px 0;animation:pulse 1.5s infinite}
 /* ACTION BUTTONS */
 .card-actions{display:flex;gap:5px}
 .act-btn{flex:1;padding:7px 4px;font-family:'Space Mono',monospace;font-size:9px;font-weight:700;border-radius:6px;cursor:pointer;border:1px solid var(--border);background:var(--surf2);color:var(--muted2);letter-spacing:0.5px;text-transform:uppercase;transition:all 0.15s;text-align:center}
@@ -379,64 +371,6 @@ canvas{max-height:300px}
 let allResults=[], currentFilter='all', scanInterval=null, currentWatchlist=[];
 let selectMode=false, selectedSyms=new Set();
 let optChart=null, currentOptSym=null, optPollInterval=null;
-let optScoreCache={};  // sym -> {score, label, gf, spot} | 'loading' | 'error'
-let scoreFetchQueue=[], scoreFetching=false;
-
-// Background score fetcher — processes queue one at a time to avoid hammering API
-async function processScoreQueue(){
-  if(scoreFetching||scoreFetchQueue.length===0) return;
-  scoreFetching=true;
-  const sym=scoreFetchQueue.shift();
-  if(optScoreCache[sym] && optScoreCache[sym]!=='loading') { scoreFetching=false; processScoreQueue(); return; }
-  optScoreCache[sym]='loading';
-  updateCardScore(sym);
-  try {
-    // Start analysis if not started
-    const prog=await fetch(`/api/options/progress/${sym}`);
-    const state=await prog.json();
-    if(state.state==='not_started'||state.state==='error'){
-      await fetch(`/api/options/start/${sym}`,{method:'POST'});
-    }
-    // Poll until done (max 5 min)
-    let attempts=0;
-    while(attempts<150){
-      await new Promise(r=>setTimeout(r,2000));
-      attempts++;
-      const p2=await fetch(`/api/options/progress/${sym}`);
-      const s2=await p2.json();
-      if(s2.state==='done') break;
-      if(s2.state==='error'){ optScoreCache[sym]='error'; updateCardScore(sym); break; }
-    }
-    // Get result
-    const res=await fetch(`/api/options/result/${sym}`);
-    if(res.ok){
-      const d=await res.json();
-      if(d.state==='done'){
-        optScoreCache[sym]={score:d.score,label:d.label,gf:d.gf,spot:d.spot};
-        updateCardScore(sym);
-      } else { optScoreCache[sym]='error'; updateCardScore(sym); }
-    } else { optScoreCache[sym]='error'; updateCardScore(sym); }
-  } catch(e){ optScoreCache[sym]='error'; updateCardScore(sym); }
-  scoreFetching=false;
-  setTimeout(processScoreQueue, 300); // small delay between fetches
-}
-
-function updateCardScore(sym){
-  const el=document.getElementById(`score-${sym}`);
-  if(el) el.innerHTML=scoreHtml(sym);
-}
-
-function queueScoreFetch(syms){
-  // Only fetch for actionable stages — skip Stage 2 running and Stage 4
-  const worthFetching=['gold','stage-1-green','stage-1-yellow','stage-1-blue','stage-2b','stage-3'];
-  for(const sym of syms){
-    const r=allResults.find(x=>x.sym===sym);
-    if(r && worthFetching.includes(r.sk) && !optScoreCache[sym]){
-      scoreFetchQueue.push(sym);
-    }
-  }
-  processScoreQueue();
-}
 
 const STAGE_COLORS={'gold':'c-gold','stage-1-green':'c-green','stage-1-yellow':'c-yellow','stage-1-blue':'c-blue','stage-2b':'c-purple','stage-3':'c-orange','stage-4':'c-red','stage-2':'c-muted'};
 const PILL_COLORS={'gold':'pill-gold','stage-1-green':'pill-green','stage-1-yellow':'pill-yellow','stage-1-blue':'pill-blue','stage-2b':'pill-purple','stage-3':'pill-orange','stage-4':'pill-red'};
@@ -446,27 +380,6 @@ const COLORS={'gold':'#f0a500','stage-1-green':'#00cc66','stage-1-yellow':'#ffd7
 
 function tsiClass(v){if(v==null)return 'tsi-neutral';if(v<-40)return 'tsi-extreme';if(v<-20)return 'tsi-buy';if(v<0)return 'tsi-zero';if(v>40)return 'tsi-hprof';if(v>20)return 'tsi-prof';return 'tsi-neutral'}
 function tsiZone(v){if(v==null)return '—';if(v<-40)return '🔥🔥 EXTREME';if(v<-20)return '🔥 BUY ZONE';if(v>40)return '⚠ HEAVY';if(v>20)return '⚠ PROFITS';if(v<0)return 'BELOW ZERO';return 'NEUTRAL'}
-
-// Score color map
-const SCORE_COLORS={10:'#00cc66',9:'#00cc66',8:'#44dd88',7:'#ffd700',6:'#ffd700',5:'#ff8c00',4:'#ff8c00',3:'#ff4455',2:'#ff4455',1:'#ff4455',0:'#ff4455'};
-
-function scoreHtml(sym){
-  const job=optScoreCache[sym];
-  if(!job) return `<div class="score-badge"><div class="score-loading" id="sc-${sym}">⏳ Loading option score...</div></div>`;
-  if(job==='loading') return `<div class="score-badge"><div class="score-loading" id="sc-${sym}">⏳ Fetching option data...</div></div>`;
-  if(job==='error') return `<div class="score-badge"><div class="score-loading">— Option data unavailable</div></div>`;
-  const sc=job.score; const col=SCORE_COLORS[sc]||'#ff4455';
-  const gfTxt=job.spot>job.gf?'ABOVE GF':'BELOW GF';
-  const gfCol=job.spot>job.gf?'var(--green)':'var(--red)';
-  return `<div class="score-badge">
-    <div class="score-badge-num" style="color:${col}">${sc}/10</div>
-    <div>
-      <div class="score-badge-label" style="color:${col}">${job.label}</div>
-      <div class="score-badge-bar"><div class="score-badge-fill" style="width:${sc*10}%;background:${col}"></div></div>
-    </div>
-    <div class="score-badge-gf" style="color:${gfCol}">GF $${job.gf} · ${gfTxt}</div>
-  </div>`;
-}
 
 function renderCard(r){
   const cc=STAGE_COLORS[r.sk]||'';const pc=PILL_COLORS[r.sk]||'pill-green';
@@ -491,7 +404,6 @@ function renderCard(r){
       ${r.ab200!=null?`<span class="ma-chip ${r.ab200?'ma-up':'ma-dn'}">${r.ab200?'↑':'↓'} 200 SMA</span>`:''}
     </div>
     ${wtsi}
-    <div id="score-${r.sym}">${scoreHtml(r.sym)}</div>
     <div class="card-signal"><strong>→</strong> ${r.signal}</div>
     <div class="card-actions">
       <button class="act-btn chart-btn" onclick="openOptionModal('${r.sym}','chart')">📊 CHART</button>
@@ -524,16 +436,7 @@ function renderResults(filter){
   if(selectMode) document.querySelectorAll('.sel-checkbox').forEach(el=>el.style.display='block');
 }
 
-function setFilter(f,btn){
-  currentFilter=f;
-  document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  if(allResults.length){
-    renderResults(f);
-    // Queue fetches for newly visible cards
-    queueScoreFetch(allResults.map(r=>r.sym));
-  }
-}
+function setFilter(f,btn){currentFilter=f;document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');if(allResults.length)renderResults(f)}
 
 // ── SCAN ──────────────────────────────────────────────────────────────────
 async function startScan(){
@@ -567,9 +470,6 @@ async function pollProgress(){
     clearInterval(scanInterval);
     const res2=await fetch('/api/results');const results=await res2.json();
     allResults=results.results;renderResults(currentFilter);
-    // Auto-fetch option scores in background
-    optScoreCache={};scoreFetchQueue=[];
-    queueScoreFetch(allResults.map(r=>r.sym));
     const btn=document.getElementById('scanBtn');btn.disabled=false;btn.textContent='↺ RESCAN';
     document.getElementById('downloadBar').style.display='flex';
     document.getElementById('dlDate').textContent=results.date;
