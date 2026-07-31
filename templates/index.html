@@ -156,24 +156,32 @@ body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-ser
 /* LEVEL MAP */
 .level-map-wrap{margin-bottom:14px;background:var(--bg);border-radius:10px;border:1px solid var(--border);overflow:hidden}
 .level-map-title{font-size:10px;color:var(--muted2);font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:1px;padding:10px 14px;border-bottom:1px solid var(--border)}
-.level-map-body{position:relative;padding:10px 120px 10px 14px;min-height:220px;display:flex;flex-direction:column;justify-content:center;gap:0}
-.lm-band{display:flex;align-items:center;position:relative;margin:2px 0}
-.lm-line{height:28px;border-radius:4px;display:flex;align-items:center;padding:0 10px;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;white-space:nowrap;min-width:60px;justify-content:flex-end}
-.lm-label{position:absolute;right:-114px;font-family:'Space Mono',monospace;font-size:10px;white-space:nowrap;color:var(--text);font-weight:600}
-.lm-price{position:absolute;right:-114px;font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;color:var(--text);font-weight:700}
-.lm-price-line{background:rgba(255,255,255,0.12);border:2px solid #fff;border-radius:4px;display:flex;align-items:center;padding:0 10px;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:#fff;height:32px;justify-content:space-between;gap:8px}
-.lm-pct{font-size:9px;font-weight:400;opacity:0.7}
-/* STRUCTURE VERDICT */
-.structure-wrap{margin-bottom:14px;border-radius:10px;overflow:hidden;border:1px solid var(--border)}
-.structure-header{padding:12px 14px;display:flex;align-items:center;gap:12px}
-.structure-icon{font-size:28px}
-.structure-title{font-size:15px;font-weight:700;font-family:'Space Mono',monospace}
-.structure-subtitle{font-size:10px;opacity:0.7;font-family:'Space Mono',monospace}
-.structure-factors{padding:10px 14px;display:flex;flex-direction:column;gap:6px;background:var(--bg)}
-.factor-row{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:6px;background:var(--surf2)}
-.factor-icon{font-size:14px;flex-shrink:0;width:20px;text-align:center}
-.factor-text{font-size:11px;color:var(--text);flex:1}
-.factor-badge{font-size:9px;font-family:'Space Mono',monospace;padding:2px 8px;border-radius:10px;font-weight:700}
+.level-map-body{position:relative;padding:18px 20px;min-height:220px;display:flex;flex-direction:column;justify-content:center;gap:0}
+.lm-row{display:flex;align-items:center;position:relative;margin:14px 0}
+.lm-rule{flex:1;height:1px;position:relative}
+.lm-rule.solid{border-top:2px solid currentColor}
+.lm-rule.dashed{border-top:2px dashed currentColor}
+.lm-tag{display:flex;align-items:baseline;gap:8px;padding-left:12px;white-space:nowrap;font-family:'Space Mono',monospace}
+.lm-tag-price{font-size:12px;font-weight:700}
+.lm-tag-label{font-size:10px;font-weight:700;letter-spacing:0.5px}
+.lm-tag-pct{font-size:9px;color:var(--muted2);font-weight:400}
+.lm-row.is-price{margin:18px 0}
+.lm-row.is-price .lm-rule{border-top:2px dashed #fff;opacity:0.9}
+.lm-row.is-price .lm-tag-price{font-size:14px;color:#fff}
+.lm-row.is-price .lm-tag-label{color:rgba(255,255,255,0.6)}
+/* STRUCTURE VERDICT — compact cheatsheet panel */
+.structure-wrap{margin-bottom:14px;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:var(--surf2);font-family:'Space Mono',monospace}
+.structure-header{padding:8px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
+.structure-icon{font-size:14px;flex-shrink:0}
+.structure-title{font-size:11px;font-weight:700;letter-spacing:0.5px}
+.structure-subtitle{font-size:9px;opacity:0.6;margin-left:auto}
+.structure-factors{padding:6px 4px;display:flex;flex-direction:column;background:var(--bg)}
+.factor-row{display:flex;align-items:center;gap:8px;padding:5px 8px;border-bottom:1px solid var(--border)}
+.factor-row:last-child{border-bottom:none}
+.factor-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.factor-label{font-size:10px;color:var(--muted2);white-space:nowrap;min-width:78px}
+.factor-value{font-size:10px;color:var(--text);flex:1}
+.factor-badge{font-size:9px;padding:2px 7px;border-radius:3px;font-weight:700;letter-spacing:0.3px;flex-shrink:0}
 /* STATS ROW */
 .stats-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
 .stat-box{background:var(--surf2);border-radius:8px;padding:10px 12px;flex:1;min-width:110px;border:1px solid var(--border)}
@@ -201,7 +209,7 @@ canvas{max-height:300px}
     <div class="logo-mark">✦</div>
     <div>
       <div class="logo-text">GOLDEN <span>SCANNER</span></div>
-      <div class="logo-sub">Gerald Peters · TSI 25/13/8</div>
+      <div class="logo-sub">TSI 25/13/8 · Stage System</div>
     </div>
   </div>
   <div class="header-right">
@@ -244,7 +252,7 @@ canvas{max-height:300px}
   <div class="start-screen">
     <div class="start-icon">✦</div>
     <div class="start-title">GOLDEN SCANNER</div>
-    <div class="start-sub">Gerald Peters Stage System<br>TSI 25/13/8 · Daily + Weekly<br>Option Chain · Net Premium · Pine Script<br><br>Tap <strong style="color:var(--gold)">RUN SCAN</strong> to begin</div>
+    <div class="start-sub">Golden Scanner<br>TSI 25/13/8 · Daily + Weekly<br>Option Chain · Net Premium · Pine Script<br><br>Tap <strong style="color:var(--gold)">RUN SCAN</strong> to begin</div>
   </div>
 </div>
 
@@ -467,7 +475,7 @@ async function startScan(){
   document.getElementById('filtersBar').style.display='flex';
   document.getElementById('downloadBar').style.display='none';
   allResults=[];
-  document.getElementById('mainContent').innerHTML=`<div class="loading-screen"><div class="loading-title">SCANNING YOUR WATCHLIST</div><div class="progress-track"><div class="progress-fill" id="pFill" style="width:0%"></div></div><div class="loading-sub">TSI 25/13/8 · 7 EMA · 21 EMA · 200 SMA<br>Daily + Weekly · Gerald Peters Stages</div><div class="loading-ticker" id="lTick">Connecting to Yahoo Finance...</div></div>`;
+  document.getElementById('mainContent').innerHTML=`<div class="loading-screen"><div class="loading-title">SCANNING YOUR WATCHLIST</div><div class="progress-track"><div class="progress-fill" id="pFill" style="width:0%"></div></div><div class="loading-sub">TSI 25/13/8 · 7 EMA · 21 EMA · 200 SMA<br>Daily + Weekly · Stage System</div><div class="loading-ticker" id="lTick">Connecting to Yahoo Finance...</div></div>`;
   const wlRes=await fetch('/api/watchlist');const wlData=await wlRes.json();currentWatchlist=wlData.tickers;
   await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({watchlist:currentWatchlist})});
   scanInterval=setInterval(pollProgress,1200);
@@ -623,137 +631,121 @@ async function loadOptResults(sym){
 function buildLevelMap(d){
   const spot=d.spot, gf=d.gf, mp=d.mp, cw=d.cw, pw=d.pw;
   const levels=[
-    {price:cw,  label:'CALL WALL', color:'#00e08a', bg:'rgba(0,224,138,0.15)', txt:'#00e08a'},
-    {price:mp,  label:'MAX PAIN',  color:'#f5a623', bg:'rgba(245,166,35,0.2)',  txt:'#f5a623'},
-    {price:spot,label:'PRICE',     color:'#ffffff', bg:'rgba(255,255,255,0.1)', txt:'#ffffff', isPrice:true},
-    {price:gf,  label:'GAMMA FLIP',color:'#00d4e8', bg:'rgba(0,212,232,0.15)', txt:'#00d4e8'},
-    {price:pw,  label:'PUT WALL',  color:'#ff3d5a', bg:'rgba(255,61,90,0.15)', txt:'#ff3d5a'},
+    {price:cw,  label:'CALL WALL', color:'#00e08a', style:'solid'},
+    {price:mp,  label:'MAX PAIN',  color:'#f5a623', style:'dashed'},
+    {price:spot,label:'PRICE',     color:'#ffffff', isPrice:true},
+    {price:gf,  label:'GAMMA FLIP',color:'#00d4e8', style:'solid'},
+    {price:pw,  label:'PUT WALL',  color:'#ff3d5a', style:'solid'},
   ];
 
-  // Sort high to low
+  // Sort high to low (top of ladder = highest price)
   levels.sort((a,b)=>b.price-a.price);
-
-  // Min/max for scaling
-  const prices=levels.map(l=>l.price);
-  const minP=Math.min(...prices), maxP=Math.max(...prices);
-  const range=maxP-minP||1;
 
   const body=document.getElementById('levelMapBody');
   body.innerHTML='';
-  body.style.minHeight=(levels.length*44+20)+'px';
 
   levels.forEach(lv=>{
-    const pct=((lv.price-minP)/range*100);
     const pctFromSpot=(((lv.price-spot)/spot)*100).toFixed(1);
     const sign=lv.price>=spot?'+':'';
 
-    const band=document.createElement('div');
-    band.className='lm-band';
-    band.style.cssText=`position:relative;margin:3px 0`;
+    const row=document.createElement('div');
+    row.className='lm-row'+(lv.isPrice?' is-price':'');
 
     if(lv.isPrice){
-      band.innerHTML=`
-        <div class="lm-price-line" style="width:${40+pct*0.4}%;min-width:120px;background:rgba(255,255,255,0.08);border:2px solid rgba(255,255,255,0.8)">
-          <span style="font-size:12px;font-weight:700;color:#fff">$${spot}</span>
-          <span style="font-size:9px;color:rgba(255,255,255,0.5);font-family:'Space Mono',monospace">CURRENT PRICE</span>
+      row.innerHTML=`
+        <div class="lm-rule"></div>
+        <div class="lm-tag">
+          <span class="lm-tag-price">$${spot}</span>
+          <span class="lm-tag-label">CURRENT PRICE</span>
         </div>`;
     } else {
-      band.innerHTML=`
-        <div class="lm-line" style="width:${40+pct*0.4}%;min-width:80px;background:${lv.bg};border:1px solid ${lv.color}40;color:${lv.txt}">
-          $${lv.price}
-        </div>
-        <div style="position:absolute;left:calc(${40+pct*0.4}% + 10px);top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:1px">
-          <span style="font-size:10px;font-weight:700;color:${lv.txt};font-family:'Space Mono',monospace">${lv.label}</span>
-          <span style="font-size:10px;color:var(--muted2);font-family:'Space Mono',monospace">${sign}${pctFromSpot}% vs price</span>
+      row.innerHTML=`
+        <div class="lm-rule ${lv.style}" style="color:${lv.color}"></div>
+        <div class="lm-tag" style="color:${lv.color}">
+          <span class="lm-tag-price">$${lv.price}</span>
+          <span class="lm-tag-label">${lv.label}</span>
+          <span class="lm-tag-pct">${sign}${pctFromSpot}% vs price</span>
         </div>`;
     }
-    body.appendChild(band);
+    body.appendChild(row);
   });
 }
 
-// ── STRUCTURE VERDICT ──
+// ── STRUCTURE VERDICT (compact cheatsheet) ──
 function buildStructure(d){
   const spot=d.spot, gf=d.gf, mp=d.mp, cw=d.cw, pw=d.pw, pc=d.pc_ratio;
   const factors=[];
   let bulls=0, bears=0;
 
-  // Factor 1: GF
+  // Factor 1: Gamma Flip
   const aboveGF=spot>gf;
   factors.push({
-    icon: aboveGF?'✅':'⚠️',
-    text: aboveGF?`Above Gamma Flip ($${gf}) — Positive gamma regime. Market makers stabilize moves.`:`Below Gamma Flip ($${gf}) — Negative gamma regime. Moves get amplified, volatility increases.`,
+    label:'GAMMA FLIP',
+    value:`$${gf} · ${aboveGF?'above (+gamma)':'below (-gamma)'}`,
     badge: aboveGF?'BULLISH':'CAUTION',
-    bcolor: aboveGF?'rgba(0,204,102,0.15)':'rgba(255,140,0,0.15)',
-    tcolor: aboveGF?'var(--green)':'var(--orange)',
+    color: aboveGF?'var(--green)':'var(--orange)',
     bull: aboveGF
   });
   aboveGF?bulls++:bears++;
 
-  // Factor 2: MP
+  // Factor 2: Max Pain
   const aboveMP=mp>spot;
   const mpPct=(((mp-spot)/spot)*100).toFixed(1);
   const sign=mp>=spot?'+':'';
   factors.push({
-    icon: aboveMP?'✅':'⚠️',
-    text: aboveMP?`Max Pain $${mp} is ${sign}${mpPct}% above price — Gravitational pull upward toward expiration.`:`Max Pain $${mp} is ${mpPct}% below price — Gravitational pull downward toward expiration.`,
+    label:'MAX PAIN',
+    value:`$${mp} · ${sign}${mpPct}% vs price`,
     badge: aboveMP?'BULLISH':'BEARISH',
-    bcolor: aboveMP?'rgba(0,204,102,0.15)':'rgba(255,68,85,0.12)',
-    tcolor: aboveMP?'var(--green)':'var(--red)',
+    color: aboveMP?'var(--green)':'var(--red)',
     bull: aboveMP
   });
   aboveMP?bulls++:bears++;
 
   // Factor 3: Call Wall vs Put Wall
   const cwAbove=cw>spot, pwBelow=pw<spot;
-  const cwPct=(((cw-spot)/spot)*100).toFixed(1);
-  const pwPct=(((spot-pw)/spot)*100).toFixed(1);
   const wallsBull=cwAbove&&pwBelow;
   factors.push({
-    icon: wallsBull?'✅':'⚠️',
-    text: wallsBull?`Call Wall $${cw} (+${cwPct}%) above, Put Wall $${pw} (-${pwPct}%) below — Price contained in bullish range.`:`Walls not ideally positioned. Call Wall $${cw}, Put Wall $${pw}. Watch for breakout direction.`,
+    label:'WALLS',
+    value:`CW $${cw} / PW $${pw}`,
     badge: wallsBull?'BULLISH':'NEUTRAL',
-    bcolor: wallsBull?'rgba(0,204,102,0.15)':'rgba(255,215,0,0.1)',
-    tcolor: wallsBull?'var(--green)':'#ffd700',
+    color: wallsBull?'var(--green)':'#ffd700',
     bull: wallsBull
   });
   wallsBull?bulls++:bears++;
 
   // Factor 4: P/C Ratio
-  const pcBull=pc<0.9;const pcBear=pc>1.1;
+  const pcBull=pc<0.9; const pcBear=pc>1.1;
   factors.push({
-    icon: pcBull?'✅':pcBear?'🔴':'➖',
-    text: pcBull?`P/C Ratio ${pc} — More calls than puts. Institutions positioned bullish.`:pcBear?`P/C Ratio ${pc} — Heavy put buying. Institutions hedging for downside.`:`P/C Ratio ${pc} — Neutral positioning. No strong directional bias.`,
+    label:'P/C RATIO',
+    value:`${pc} · ${pcBull?'call heavy':pcBear?'put heavy':'balanced'}`,
     badge: pcBull?'BULLISH':pcBear?'BEARISH':'NEUTRAL',
-    bcolor: pcBull?'rgba(0,204,102,0.15)':pcBear?'rgba(255,68,85,0.12)':'rgba(255,215,0,0.1)',
-    tcolor: pcBull?'var(--green)':pcBear?'var(--red)':'#ffd700',
+    color: pcBull?'var(--green)':pcBear?'var(--red)':'#ffd700',
     bull: pcBull
   });
   pcBull?bulls++:pcBear?bears++:0;
 
-  // Verdict
+  // Overall verdict
   const total=bulls+bears;
   const ratio=bulls/Math.max(total,1);
-  let verdict, vicon, vbg, vcolor;
-  if(ratio>=0.75){verdict='BULLISH STRUCTURE';vicon='🟢';vbg='rgba(0,204,102,0.12)';vcolor='var(--green)'}
-  else if(ratio>=0.5){verdict='MOSTLY BULLISH';vicon='🟡';vbg='rgba(255,215,0,0.08)';vcolor='#ffd700'}
-  else if(ratio>=0.25){verdict='MOSTLY BEARISH';vicon='🟠';vbg='rgba(255,140,0,0.1)';vcolor='var(--orange)'}
-  else{verdict='BEARISH STRUCTURE';vicon='🔴';vbg='rgba(255,68,85,0.1)';vcolor='var(--red)'}
+  let verdict, vicon, vcolor;
+  if(ratio>=0.75){verdict='BULLISH STRUCTURE';vicon='🟢';vcolor='var(--green)'}
+  else if(ratio>=0.5){verdict='MOSTLY BULLISH';vicon='🟡';vcolor='#ffd700'}
+  else if(ratio>=0.25){verdict='MOSTLY BEARISH';vicon='🟠';vcolor='var(--orange)'}
+  else{verdict='BEARISH STRUCTURE';vicon='🔴';vcolor='var(--red)'}
 
   const header=document.getElementById('structureHeader');
-  header.style.background=vbg;
   header.innerHTML=`
-    <div class="structure-icon">${vicon}</div>
-    <div>
-      <div class="structure-title" style="color:${vcolor}">${verdict}</div>
-      <div class="structure-subtitle">${bulls} bullish · ${bears} bearish factors</div>
-    </div>`;
+    <span class="structure-icon">${vicon}</span>
+    <span class="structure-title" style="color:${vcolor}">${verdict}</span>
+    <span class="structure-subtitle">${bulls}B · ${bears}Be</span>`;
 
   const factorsEl=document.getElementById('structureFactors');
   factorsEl.innerHTML=factors.map(f=>`
     <div class="factor-row">
-      <span class="factor-icon">${f.icon}</span>
-      <span class="factor-text">${f.text}</span>
-      <span class="factor-badge" style="background:${f.bcolor};color:${f.tcolor}">${f.badge}</span>
+      <span class="factor-dot" style="background:${f.color}"></span>
+      <span class="factor-label">${f.label}</span>
+      <span class="factor-value">${f.value}</span>
+      <span class="factor-badge" style="background:${f.color}22;color:${f.color}">${f.badge}</span>
     </div>`).join('');
 }
 
