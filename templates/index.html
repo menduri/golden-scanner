@@ -213,6 +213,7 @@ canvas{max-height:300px}
     </div>
   </div>
   <div class="header-right">
+    <button class="icon-btn" id="labelToggleBtn" onclick="toggleLabelColor()" title="Switch label text between blue-gray and white">◐ LABELS</button>
     <button class="icon-btn" onclick="toggleSelectMode()">☑ SELECT</button>
     <button class="icon-btn" onclick="openModal()">⊕ WATCHLIST</button>
     <button class="scan-btn" id="scanBtn" onclick="startScan()">▶ RUN SCAN</button>
@@ -401,6 +402,20 @@ let allResults=[], currentFilter='all', scanInterval=null, currentWatchlist=[];
 let selectMode=false, selectedSyms=new Set();
 let optChart=null, currentOptSym=null, optPollInterval=null;
 let netChartData=[];
+
+// ── LABEL COLOR TOGGLE (blue-gray vs white) ──
+const LABEL_COLOR_GRAY='#9ab8d4', LABEL_COLOR_WHITE='#ffffff';
+function applyLabelColor(mode){
+  document.documentElement.style.setProperty('--muted2', mode==='white' ? LABEL_COLOR_WHITE : LABEL_COLOR_GRAY);
+  const btn=document.getElementById('labelToggleBtn');
+  if(btn) btn.textContent = mode==='white' ? '◑ LABELS: WHITE' : '◐ LABELS: GRAY';
+  localStorage.setItem('gs_label_color', mode);
+}
+function toggleLabelColor(){
+  const current=localStorage.getItem('gs_label_color')||'gray';
+  applyLabelColor(current==='gray' ? 'white' : 'gray');
+}
+applyLabelColor(localStorage.getItem('gs_label_color')||'gray');
 
 const STAGE_COLORS={'gold':'c-gold','stage-1-green':'c-green','stage-1-yellow':'c-yellow','stage-1-blue':'c-blue','stage-2b':'c-purple','stage-3':'c-orange','stage-4':'c-red','stage-2':'c-muted'};
 const PILL_COLORS={'gold':'pill-gold','stage-1-green':'pill-green','stage-1-yellow':'pill-yellow','stage-1-blue':'pill-blue','stage-2b':'pill-purple','stage-3':'pill-orange','stage-4':'pill-red'};
