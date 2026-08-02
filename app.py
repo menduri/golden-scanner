@@ -102,7 +102,7 @@ def classify_ticker(sym,daily,weekly):
             cw=weekly['Close'].dropna()
             if len(cw)>=60:
                 tw,_=calc_tsi(cw); wtsi_val=float(tw.iloc[-1])
-        if not ab21 and not prev_ab21 and price<prev:
+        if not ab21 and not prev_ab21 and price<prev and tsi_val>-20:
             sk='stage-4'; label='🔴 STAGE 4'; buy=False
             signal='Two candles below 21 EMA. Price declining. EXIT position.'
         elif not ab7 and ab21:
