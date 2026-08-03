@@ -910,8 +910,11 @@ function updateCount(){
 }
 async function saveWatchlist(){
   const t=document.getElementById('watchlistInput').value.split(/[\n,]+/).map(s=>s.trim().toUpperCase()).filter(Boolean);
-  await fetch('/api/watchlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tickers:t})});
-  showToast('Watchlist saved!');setTimeout(closeModal,1200);
+  const res=await fetch('/api/watchlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tickers:t})});
+  const data=await res.json();
+  if(data.synced){ showToast('Watchlist saved — synced everywhere!'); }
+  else { showToast('Saved locally, but sync failed — check GitHub token'); }
+  setTimeout(closeModal,1200);
 }
 
 // ── UTILS ──
