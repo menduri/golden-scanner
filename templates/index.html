@@ -243,6 +243,11 @@ canvas{max-height:300px}
   <button class="fbtn" onclick="setFilter('buy',this)">✓ BUY ZONE</button>
 </div>
 
+<div id="errorNotice" style="display:none;padding:8px 16px;background:rgba(255,68,85,0.08);border-bottom:1px solid var(--border);font-family:'Space Mono',monospace;font-size:11px;color:var(--red);cursor:pointer" onclick="this.querySelector('.err-list').style.display=this.querySelector('.err-list').style.display==='none'?'block':'none'">
+  <span id="errorSummary"></span>
+  <div class="err-list" id="errorList" style="display:none;margin-top:6px;color:var(--muted2);font-size:10px;line-height:1.6"></div>
+</div>
+
 <div class="universal-bar" id="universalBar">
   <div class="sel-count">Selected: <span id="selCount">0</span> stocks</div>
   <button class="clear-sel" onclick="clearSelection()">✕ Clear</button>
@@ -518,6 +523,14 @@ async function pollProgress(){
     document.getElementById('downloadBar').style.display='flex';
     document.getElementById('dlDate').textContent=results.date;
     document.getElementById('dlCount').textContent=`${allResults.length} setups found`;
+    const errNotice=document.getElementById('errorNotice');
+    if(results.errors && results.errors.length>0){
+      document.getElementById('errorSummary').textContent=`⚠ ${results.errors.length} ticker(s) failed to load — tap to see which`;
+      document.getElementById('errorList').textContent=results.errors.join(', ');
+      errNotice.style.display='block';
+    } else {
+      errNotice.style.display='none';
+    }
   }
 }
 
