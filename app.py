@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, send_file, Response
 import yfinance as yf
 import pandas as pd
 import json, os, io, threading
+import requests
 from datetime import date
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -10,6 +11,46 @@ import warnings
 warnings.filterwarnings('ignore')
 
 app = Flask(__name__)
+
+# ── WATCHLIST SYNC (GitHub Gist) ─────────────────────────────────────────────
+# Render's free tier wipes local disk on every restart/redeploy, so the
+# watchlist can't live in a local file — it lives in a private GitHub Gist
+# instead, which any device can read/write through the GitHub API.
+# Fill these in after creating a token (Settings -> Developer settings ->
+# Personal access tokens, "gist" scope) and a private Gist containing a file
+# named "golden_scanner_watchlist.json" with content: []
+GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
+GITHUB_GIST_ID = os.environ.get('GITHUB_GIST_ID', '')
+GIST_FILENAME = 'golden_scanner_watchlist.json'
+
+def load_watchlist_from_gist():
+    try:
+        r = requests.get(
+            f'https://api.github.com/gists/{GITHUB_GIST_ID}',
+            headers={'Authorization': f'token {GITHUB_TOKEN}', 'Accept': 'application/vnd.github+json'},
+            timeout=10
+        )
+        r.raise_for_status()
+        content = r.json()['files'][GIST_FILENAME]['content']
+        tickers = json.loads(content)
+        return tickers if isinstance(tickers, list) else None
+    except Exception as e:
+        print('Gist load failed:', e)
+        return None
+
+def save_watchlist_to_gist(tickers):
+    try:
+        r = requests.patch(
+            f'https://api.github.com/gists/{GITHUB_GIST_ID}',
+            headers={'Authorization': f'token {GITHUB_TOKEN}', 'Accept': 'application/vnd.github+json'},
+            json={'files': {GIST_FILENAME: {'content': json.dumps(tickers)}}},
+            timeout=10
+        )
+        r.raise_for_status()
+        return True
+    except Exception as e:
+        print('Gist save failed:', e)
+        return False
 
 # ── DEFAULT WATCHLIST ────────────────────────────────────────────────────────
 DEFAULT_WATCHLIST = [
@@ -332,11 +373,19 @@ def watchlist_api():
     if request.method=='POST':
         data=request.json
         tickers=[t.strip().upper() for t in data.get('tickers',[]) if t.strip()]
-        with open(wl_file,'w') as f: json.dump(tickers,f)
-        return jsonify({'saved':True,'count':len(tickers)})
-    if os.path.exists(wl_file):
-        with open(wl_file) as f: tickers=json.load(f)
-    else: tickers=DEFAULT_WATCHLIST
+        synced=save_watchlist_to_gist(tickers)
+        try:
+            with open(wl_file,'w') as f: json.dump(tickers,f)
+        except Exception:
+            pass
+        return jsonify({'saved':True,'count':len(tickers),'synced':synced})
+    # GET — Gist is the source of truth so every device sees the same list
+    tickers=load_watchlist_from_gist()
+    if tickers is None:
+        if os.path.exists(wl_file):
+            with open(wl_file) as f: tickers=json.load(f)
+        else:
+            tickers=DEFAULT_WATCHLIST
     return jsonify({'tickers':tickers,'count':len(tickers)})
 
 # ── OPTION CHAIN ROUTES ───────────────────────────────────────────────────────
