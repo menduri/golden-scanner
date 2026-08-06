@@ -22,6 +22,7 @@ app = Flask(__name__)
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
 GITHUB_GIST_ID = os.environ.get('GITHUB_GIST_ID', '')
 GIST_FILENAME = 'golden_scanner_watchlist.json'
+ANCHOR_FILENAME = 'golden_scanner_anchors.json'
 
 def load_watchlist_from_gist():
     try:
@@ -50,6 +51,39 @@ def save_watchlist_to_gist(tickers):
         return True
     except Exception as e:
         print('Gist save failed:', e)
+        return False
+
+def load_anchors_from_gist():
+    """Per-ticker Stage 1 anchor state: {sym: {'anchor': low_price, 'date': 'YYYY-MM-DD'}}"""
+    try:
+        r = requests.get(
+            f'https://api.github.com/gists/{GITHUB_GIST_ID}',
+            headers={'Authorization': f'token {GITHUB_TOKEN}', 'Accept': 'application/vnd.github+json'},
+            timeout=10
+        )
+        r.raise_for_status()
+        files = r.json().get('files', {})
+        if ANCHOR_FILENAME not in files:
+            return {}
+        content = files[ANCHOR_FILENAME]['content']
+        anchors = json.loads(content)
+        return anchors if isinstance(anchors, dict) else {}
+    except Exception as e:
+        print('Anchor load failed:', e)
+        return {}
+
+def save_anchors_to_gist(anchors):
+    try:
+        r = requests.patch(
+            f'https://api.github.com/gists/{GITHUB_GIST_ID}',
+            headers={'Authorization': f'token {GITHUB_TOKEN}', 'Accept': 'application/vnd.github+json'},
+            json={'files': {ANCHOR_FILENAME: {'content': json.dumps(anchors)}}},
+            timeout=10
+        )
+        r.raise_for_status()
+        return True
+    except Exception as e:
+        print('Anchor save failed:', e)
         return False
 
 # ── DEFAULT WATCHLIST ────────────────────────────────────────────────────────
@@ -120,12 +154,14 @@ def fetch_ticker(sym):
         return daily,weekly
     except: return None
 
-def classify_ticker(sym,daily,weekly):
+def classify_ticker(sym,daily,weekly,anchors):
     try:
         import math
         closes_d=daily['Close'].dropna()
+        lows_d=daily['Low'].dropna()
         if len(closes_d)<60: return None
         price=float(closes_d.iloc[-1]); prev=float(closes_d.iloc[-2])
+        today_low=float(lows_d.iloc[-1]) if len(lows_d) else price
         if math.isnan(price) or math.isnan(prev): return None
         tsi_d,_=calc_tsi(closes_d)
         ema7_d=ema(closes_d,7); ema21_d=ema(closes_d,21)
@@ -143,19 +179,35 @@ def classify_ticker(sym,daily,weekly):
             cw=weekly['Close'].dropna()
             if len(cw)>=60:
                 tw,_=calc_tsi(cw); wtsi_val=float(tw.iloc[-1])
+
+        # ── ANCHOR STATE ── (persists across scans via Gist)
+        entry=anchors.get(sym)
+        anchor_price=entry['anchor'] if entry else None
+        anchor_holding=(anchor_price is not None and price>=anchor_price)
+
         if not ab21 and not prev_ab21 and price<prev and tsi_val>-20:
-            sk='stage-4'; label='🔴 STAGE 4'; buy=False
-            signal='Two candles below 21 EMA. Price declining. EXIT position.'
+            if anchor_holding:
+                sk='stage-1-green'; label='🟢 STAGE 1'; buy=True
+                signal=f'TSI {tsi_val:.1f}. Pulled back below 21 EMA but anchor ${anchor_price:.2f} still holding. Still accumulating.'
+            else:
+                sk='stage-4'; label='🔴 STAGE 4'; buy=False
+                signal='Two candles below 21 EMA. Price declining. EXIT position.'
         elif not ab7 and ab21:
-            sk='stage-3'; label='🟠 STAGE 3'; buy=False
-            if tsi_val>40: signal=f'TSI {tsi_val:.1f} — Take HEAVY profits now.'
-            elif tsi_val>20: signal=f'TSI {tsi_val:.1f} — Start taking small profits.'
-            else: signal=f'TSI {tsi_val:.1f}. Distribution zone. Watch closely.'
+            if anchor_holding:
+                sk='stage-1-blue'; label='🔵 STAGE 1 CONT.'; buy=True
+                signal=f'TSI {tsi_val:.1f}. Pulled back below 7 EMA but above anchor ${anchor_price:.2f}. Still accumulating.'
+            else:
+                sk='stage-3'; label='🟠 STAGE 3'; buy=False
+                if tsi_val>40: signal=f'TSI {tsi_val:.1f} — Take HEAVY profits now.'
+                elif tsi_val>20: signal=f'TSI {tsi_val:.1f} — Start taking small profits.'
+                else: signal=f'TSI {tsi_val:.1f}. Distribution zone. Watch closely.'
         elif ab21 and not prev_ab21:
             sk='stage-2b'; label='🟣 S2 BREAKOUT'; buy=True
             signal='Candle broke above 21 EMA. Last buy before the run.'
         elif not ab21:
             if tsi_val<-20 and ab7:
+                if not entry:
+                    anchors[sym]={'anchor':today_low,'date':date.today().strftime("%Y-%m-%d")}
                 if wtsi_val and wtsi_val<-20:
                     sk='gold'; label='🥇 GOLD SETUP'; buy=True
                     signal=f'{"🔥 TSI "+str(round(tsi_val,1))+" EXTREME. " if tsi_val<-40 else "TSI "+str(round(tsi_val,1))+". "}Weekly {wtsi_val:.1f}. HEAVY BUY.'
@@ -163,8 +215,13 @@ def classify_ticker(sym,daily,weekly):
                     sk='stage-1-green'; label='🟢 STAGE 1'; buy=True
                     signal=f'{"🔥 TSI "+str(round(tsi_val,1))+" EXTREMELY HOT. HEAVY BUY." if tsi_val<-40 else "TSI "+str(round(tsi_val,1))+". Candle above 7 EMA. Accumulate."}'
             elif tsi_val<-20 and not ab7:
-                sk='stage-1-yellow'; label='🟡 WATCH'; buy=False
-                signal=f'{"🔥 " if tsi_val<-40 else ""}TSI {tsi_val:.1f}. Wait for candle close above 7 EMA.'
+                if entry and not anchor_holding:
+                    sk='stage-1-yellow'; label='🟡 WATCH'; buy=False
+                    signal=f'⚠ Anchor ${anchor_price:.2f} broken. TSI {tsi_val:.1f}. Waiting for a new Stage 1 confirmation.'
+                    anchors.pop(sym,None)
+                else:
+                    sk='stage-1-yellow'; label='🟡 WATCH'; buy=False
+                    signal=f'{"🔥 " if tsi_val<-40 else ""}TSI {tsi_val:.1f}. Wait for candle close above 7 EMA.'
             elif -20<=tsi_val<=0 and ab7:
                 sk='stage-1-blue'; label='🔵 STAGE 1 CONT.'; buy=True
                 signal=f'TSI {tsi_val:.1f} (below 0). Candle above 7 EMA. Accumulate lightly.'
@@ -172,6 +229,11 @@ def classify_ticker(sym,daily,weekly):
                 sk='stage-2'; label='⬜ STAGE 2'; buy=False; signal='Running. Hold.'
         else:
             sk='stage-2'; label='⬜ STAGE 2'; buy=False; signal='Running above 7 & 21 EMA. Hold.'
+
+        # Cycle retires once TSI reaches the sell zone — anchor no longer relevant
+        if entry and tsi_val>=20:
+            anchors.pop(sym,None)
+
         return {
             'sym':sym,'price':round(price,2),'tsi':round(tsi_val,2),
             'tsi_dir':tsi_dir,'wtsi':round(wtsi_val,2) if wtsi_val else None,
@@ -198,13 +260,17 @@ def run_scan_thread(watchlist):
     scan_state.update({'running':True,'done':False,'results':[],'errors':[],
                        'total':len(watchlist),'progress':0,
                        'date':date.today().strftime("%B %d, %Y")})
+    anchors=load_anchors_from_gist()
+    anchors_before=json.dumps(anchors,sort_keys=True)
     for i,sym in enumerate(watchlist):
         scan_state['current']=sym; scan_state['progress']=i+1
         data=fetch_ticker(sym)
         if data is None: scan_state['errors'].append(sym); continue
-        result=classify_ticker(sym,data[0],data[1])
+        result=classify_ticker(sym,data[0],data[1],anchors)
         if result: scan_state['results'].append(result)
         else: scan_state['errors'].append(sym)
+    if json.dumps(anchors,sort_keys=True)!=anchors_before:
+        save_anchors_to_gist(anchors)
     scan_state['running']=False; scan_state['done']=True
 
 # ── OPTION CHAIN STATE ────────────────────────────────────────────────────────
