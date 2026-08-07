@@ -158,10 +158,9 @@ def classify_ticker(sym,daily,weekly,anchors):
     try:
         import math
         closes_d=daily['Close'].dropna()
-        lows_d=daily['Low'].dropna()
         if len(closes_d)<60: return None
+        lows_d=daily['Low'].reindex(closes_d.index)
         price=float(closes_d.iloc[-1]); prev=float(closes_d.iloc[-2])
-        today_low=float(lows_d.iloc[-1]) if len(lows_d) else price
         if math.isnan(price) or math.isnan(prev): return None
         tsi_d,_=calc_tsi(closes_d)
         ema7_d=ema(closes_d,7); ema21_d=ema(closes_d,21)
@@ -184,17 +183,20 @@ def classify_ticker(sym,daily,weekly,anchors):
         entry=anchors.get(sym)
         anchor_price=entry['anchor'] if entry else None
         anchor_holding=(anchor_price is not None and price>=anchor_price)
+        is_trend_anchor=bool(entry and entry.get('trend'))
+        s1_label='🟢 STAGE 1 (TREND)' if is_trend_anchor else '🟢 STAGE 1'
+        cont_label='🔵 STAGE 1 CONT. (TREND)' if is_trend_anchor else '🔵 STAGE 1 CONT.'
 
         if not ab21 and not prev_ab21 and price<prev and tsi_val>-20:
             if anchor_holding:
-                sk='stage-1-green'; label='🟢 STAGE 1'; buy=True
+                sk='stage-1-green'; label=s1_label; buy=True
                 signal=f'TSI {tsi_val:.1f}. Pulled back below 21 EMA but anchor ${anchor_price:.2f} still holding. Still accumulating.'
             else:
                 sk='stage-4'; label='🔴 STAGE 4'; buy=False
                 signal='Two candles below 21 EMA. Price declining. EXIT position.'
         elif not ab7 and ab21:
             if anchor_holding:
-                sk='stage-1-blue'; label='🔵 STAGE 1 CONT.'; buy=True
+                sk='stage-1-blue'; label=cont_label; buy=True
                 signal=f'TSI {tsi_val:.1f}. Pulled back below 7 EMA but above anchor ${anchor_price:.2f}. Still accumulating.'
             else:
                 sk='stage-3'; label='🟠 STAGE 3'; buy=False
@@ -207,13 +209,36 @@ def classify_ticker(sym,daily,weekly,anchors):
         elif not ab21:
             if tsi_val<-20 and ab7:
                 if not entry:
-                    anchors[sym]={'anchor':today_low,'date':date.today().strftime("%Y-%m-%d")}
+                    # Anchor = lowest wick across the WHOLE basing period where TSI
+                    # has stayed continuously below -20, up through today's
+                    # confirmation candle — not just today's low.
+                    low_min=float(lows_d.iloc[-1])
+                    j=len(tsi_d)-2
+                    while j>=0 and float(tsi_d.iloc[j])<-20:
+                        lj=lows_d.iloc[j]
+                        if not pd.isna(lj): low_min=min(low_min,float(lj))
+                        j-=1
+                    anchors[sym]={'anchor':low_min,'date':date.today().strftime("%Y-%m-%d"),'trend':False}
                 if wtsi_val and wtsi_val<-20:
                     sk='gold'; label='🥇 GOLD SETUP'; buy=True
                     signal=f'{"🔥 TSI "+str(round(tsi_val,1))+" EXTREME. " if tsi_val<-40 else "TSI "+str(round(tsi_val,1))+". "}Weekly {wtsi_val:.1f}. HEAVY BUY.'
                 else:
                     sk='stage-1-green'; label='🟢 STAGE 1'; buy=True
                     signal=f'{"🔥 TSI "+str(round(tsi_val,1))+" EXTREMELY HOT. HEAVY BUY." if tsi_val<-40 else "TSI "+str(round(tsi_val,1))+". Candle above 7 EMA. Accumulate."}'
+            elif ab200 and tsi_val<5 and ab7 and not entry:
+                # Trend-based Stage 1: strong long-term uptrend (above 200 SMA),
+                # TSI dipped under 5 without ever reaching -20, and price already
+                # confirmed by closing back above the 7 EMA. Fires on confirmation
+                # only — no separate "Watch" state for this narrower threshold.
+                low_min=float(lows_d.iloc[-1])
+                j=len(tsi_d)-2
+                while j>=0 and float(tsi_d.iloc[j])<5:
+                    lj=lows_d.iloc[j]
+                    if not pd.isna(lj): low_min=min(low_min,float(lj))
+                    j-=1
+                anchors[sym]={'anchor':low_min,'date':date.today().strftime("%Y-%m-%d"),'trend':True}
+                sk='stage-1-green'; label='🟢 STAGE 1 (TREND)'; buy=True
+                signal=f'TSI {tsi_val:.1f} (200 SMA uptrend, never hit -20). Candle above 7 EMA. Accumulate.'
             elif tsi_val<-20 and not ab7:
                 if entry and not anchor_holding:
                     sk='stage-1-yellow'; label='🟡 WATCH'; buy=False
@@ -223,7 +248,7 @@ def classify_ticker(sym,daily,weekly,anchors):
                     sk='stage-1-yellow'; label='🟡 WATCH'; buy=False
                     signal=f'{"🔥 " if tsi_val<-40 else ""}TSI {tsi_val:.1f}. Wait for candle close above 7 EMA.'
             elif -20<=tsi_val<=0 and ab7:
-                sk='stage-1-blue'; label='🔵 STAGE 1 CONT.'; buy=True
+                sk='stage-1-blue'; label=cont_label; buy=True
                 signal=f'TSI {tsi_val:.1f} (below 0). Candle above 7 EMA. Accumulate lightly.'
             else:
                 sk='stage-2'; label='⬜ STAGE 2'; buy=False; signal='Running. Hold.'
