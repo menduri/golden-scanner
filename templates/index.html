@@ -163,6 +163,8 @@ body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-ser
 .pos-toggle button.active{background:var(--gold);color:#000}
 .pos-hist-row{display:flex;justify-content:space-between;font-size:10px;font-family:'Space Mono',monospace;color:var(--muted2);padding:6px 0;border-bottom:1px solid var(--border)}
 .pl-pos{color:var(--green)}.pl-neg{color:var(--red)}
+.pos-del{color:var(--red);cursor:pointer;padding:0 4px;font-weight:700;opacity:0.7}
+.pos-del:hover{opacity:1}
 /* OPTION MODAL */
 .opt-modal{max-width:820px;max-height:92vh}
 .opt-tabs{display:flex;gap:6px;border-bottom:1px solid var(--border);padding-bottom:12px}
@@ -1148,7 +1150,7 @@ function openPosDetail(sym){
   html+=p.buys.map(b=>`<div class="pos-hist-row"><span>${b.date}</span><span>${b.shares.toFixed(4)} sh @ $${b.price.toFixed(2)}</span><span>$${b.amount.toFixed(2)}</span></div>`).join('');
   if(p.sells&&p.sells.length){
     html+=`<div class="modal-sub" style="margin:10px 0 6px">SELL HISTORY</div>`;
-    html+=p.sells.map(s=>`<div class="pos-hist-row"><span>${s.date}</span><span>${s.shares.toFixed(4)} sh @ $${s.price.toFixed(2)}</span><span class="${s.realized_pl>=0?'pl-pos':'pl-neg'}">${s.realized_pl>=0?'+':''}$${s.realized_pl.toFixed(2)}</span></div>`).join('');
+    html+=p.sells.map((s,i)=>`<div class="pos-hist-row"><span>${s.date}</span><span>${s.shares.toFixed(4)} sh @ $${s.price.toFixed(2)}</span><span class="${s.realized_pl>=0?'pl-pos':'pl-neg'}">${s.realized_pl>=0?'+':''}$${s.realized_pl.toFixed(2)}</span><span class="pos-del" onclick="deleteSell('${sym}',${i})" title="Delete this sell">✕</span></div>`).join('');
   }
   document.getElementById('posDetailBody').innerHTML=html;
   document.getElementById('posDetailFooter').innerHTML=`
@@ -1167,7 +1169,7 @@ function openClosedDetail(idx){
   </div><div class="modal-sub" style="margin-bottom:6px">BUY HISTORY</div>`;
   html+=c.buys.map(b=>`<div class="pos-hist-row"><span>${b.date}</span><span>${b.shares.toFixed(4)} sh @ $${b.price.toFixed(2)}</span><span>$${b.amount.toFixed(2)}</span></div>`).join('');
   html+=`<div class="modal-sub" style="margin:10px 0 6px">SELL HISTORY</div>`;
-  html+=c.sells.map(s=>`<div class="pos-hist-row"><span>${s.date}</span><span>${s.shares.toFixed(4)} sh @ $${s.price.toFixed(2)}</span><span class="${s.realized_pl>=0?'pl-pos':'pl-neg'}">${s.realized_pl>=0?'+':''}$${s.realized_pl.toFixed(2)}</span></div>`).join('');
+  html+=c.sells.map((s,i)=>`<div class="pos-hist-row"><span>${s.date}</span><span>${s.shares.toFixed(4)} sh @ $${s.price.toFixed(2)}</span><span class="${s.realized_pl>=0?'pl-pos':'pl-neg'}">${s.realized_pl>=0?'+':''}$${s.realized_pl.toFixed(2)}</span><span class="pos-del" onclick="deleteClosedSell(${idx},${i})" title="Delete this sell">✕</span></div>`).join('');
   document.getElementById('posDetailBody').innerHTML=html;
   document.getElementById('posDetailFooter').innerHTML=`<button class="modal-save" style="background:var(--surf2);color:var(--blue);flex:1" onclick="openOptionModal('${c.ticker}','chart')">📊 VIEW CHART</button>`;
   document.getElementById('posDetailOverlay').classList.add('open');
@@ -1217,6 +1219,26 @@ async function submitSell(){
   const res2=await fetch('/api/positions'); positionsData=await res2.json();
   renderPositionsSummary(); renderPositionsList();
   document.getElementById('positionsOverlay').classList.add('open');
+}
+async function deleteSell(sym,sellIndex){
+  const res=await fetch('/api/positions/delete_sell',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sym,sell_index:sellIndex})});
+  const data=await res.json();
+  if(data.error){ showToast(data.error); return; }
+  showToast('Sell deleted');
+  const res2=await fetch('/api/positions'); positionsData=await res2.json();
+  renderPositionsSummary(); renderPositionsList();
+  if(positionsData.active[sym]) openPosDetail(sym); else closePosDetail();
+}
+async function deleteClosedSell(closedIndex,sellIndex){
+  const c=positionsData.closed[closedIndex]; const sym=c.ticker;
+  const res=await fetch('/api/positions/delete_sell',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sym,sell_index:sellIndex,closed_index:closedIndex})});
+  const data=await res.json();
+  if(data.error){ showToast(data.error); return; }
+  showToast(data.reopened?`Sell deleted — ${sym} reopened as active`:'Sell deleted');
+  const res2=await fetch('/api/positions'); positionsData=await res2.json();
+  renderPositionsSummary(); renderPositionsList();
+  if(data.reopened && positionsData.active[sym]){ setPosTab('active'); openPosDetail(sym); }
+  else closePosDetail();
 }
 
 // ── UTILS ──
