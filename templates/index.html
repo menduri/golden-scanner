@@ -49,6 +49,7 @@ body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-ser
 .fbtn.f-purple.active{background:rgba(187,119,255,0.1);border-color:var(--purple);color:var(--purple)}
 .fbtn.f-orange.active{background:rgba(255,140,0,0.1);border-color:var(--orange);color:var(--orange)}
 .fbtn.f-red.active{background:rgba(255,68,85,0.1);border-color:var(--red);color:var(--red)}
+.fbtn.f-gray.active{background:rgba(122,154,184,0.1);border-color:var(--muted2);color:var(--muted2)}
 /* UNIVERSAL BAR */
 .universal-bar{display:none;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surf2);align-items:center;gap:12px}
 .universal-bar.visible{display:flex}
@@ -229,6 +230,7 @@ canvas{max-height:300px}
   <div class="stat-chip"><div class="stat-chip-label">🟣 S2 Break</div><div class="stat-chip-val sv-purple" id="stPurple">0</div></div>
   <div class="stat-chip"><div class="stat-chip-label">🟠 Stage 3</div><div class="stat-chip-val sv-orange" id="stOrange">0</div></div>
   <div class="stat-chip"><div class="stat-chip-label">🔴 Stage 4</div><div class="stat-chip-val sv-red" id="stRed">0</div></div>
+  <div class="stat-chip"><div class="stat-chip-label">⬜ Stage 2</div><div class="stat-chip-val sv-muted" id="stGray">0</div></div>
 </div>
 
 <div class="filters" id="filtersBar" style="display:none">
@@ -240,6 +242,7 @@ canvas{max-height:300px}
   <button class="fbtn f-purple" onclick="setFilter('stage-2b',this)">🟣 S2 BREAKOUT</button>
   <button class="fbtn f-orange" onclick="setFilter('stage-3',this)">🟠 STAGE 3</button>
   <button class="fbtn f-red" onclick="setFilter('stage-4',this)">🔴 STAGE 4</button>
+  <button class="fbtn f-gray" onclick="setFilter('stage-2',this)">⬜ STAGE 2</button>
   <button class="fbtn" onclick="setFilter('buy',this)">✓ BUY ZONE</button>
 </div>
 
@@ -515,6 +518,7 @@ async function pollProgress(){
   document.getElementById('stPurple').textContent=data.counts['stage-2b']||0;
   document.getElementById('stOrange').textContent=data.counts['stage-3']||0;
   document.getElementById('stRed').textContent=data.counts['stage-4']||0;
+  document.getElementById('stGray').textContent=data.counts['stage-2']||0;
   if(data.done){
     clearInterval(scanInterval);
     const res2=await fetch('/api/results');const results=await res2.json();
