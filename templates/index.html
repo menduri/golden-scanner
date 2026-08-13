@@ -1175,6 +1175,7 @@ function openClosedDetail(idx){
 function closePosDetail(){ document.getElementById('posDetailOverlay').classList.remove('open'); }
 function openSellModal(sym){
   document.getElementById('posDetailOverlay').classList.remove('open');
+  document.getElementById('positionsOverlay').classList.remove('open');
   currentSellSym=sym;
   document.getElementById('sellSym').textContent=sym;
   const live=getLivePrice(sym);
@@ -1215,6 +1216,7 @@ async function submitSell(){
   closeSellModal(); closePosDetail();
   const res2=await fetch('/api/positions'); positionsData=await res2.json();
   renderPositionsSummary(); renderPositionsList();
+  document.getElementById('positionsOverlay').classList.add('open');
 }
 
 // ── UTILS ──
