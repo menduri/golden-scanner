@@ -1174,6 +1174,7 @@ function openClosedDetail(idx){
 }
 function closePosDetail(){ document.getElementById('posDetailOverlay').classList.remove('open'); }
 function openSellModal(sym){
+  document.getElementById('posDetailOverlay').classList.remove('open');
   currentSellSym=sym;
   document.getElementById('sellSym').textContent=sym;
   const live=getLivePrice(sym);
