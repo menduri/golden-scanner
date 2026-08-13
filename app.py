@@ -86,6 +86,43 @@ def save_anchors_to_gist(anchors):
         print('Anchor save failed:', e)
         return False
 
+POSITIONS_FILENAME = 'golden_scanner_positions.json'
+
+def load_positions_from_gist():
+    """{'active': {sym: {shares, avg_price, realized_pl, buys:[...], sells:[...]}}, 'closed': [...]}"""
+    try:
+        r = requests.get(
+            f'https://api.github.com/gists/{GITHUB_GIST_ID}',
+            headers={'Authorization': f'token {GITHUB_TOKEN}', 'Accept': 'application/vnd.github+json'},
+            timeout=10
+        )
+        r.raise_for_status()
+        files = r.json().get('files', {})
+        if POSITIONS_FILENAME not in files:
+            return {'active': {}, 'closed': []}
+        content = files[POSITIONS_FILENAME]['content']
+        data = json.loads(content)
+        if not isinstance(data, dict): return {'active': {}, 'closed': []}
+        data.setdefault('active', {}); data.setdefault('closed', [])
+        return data
+    except Exception as e:
+        print('Positions load failed:', e)
+        return {'active': {}, 'closed': []}
+
+def save_positions_to_gist(data):
+    try:
+        r = requests.patch(
+            f'https://api.github.com/gists/{GITHUB_GIST_ID}',
+            headers={'Authorization': f'token {GITHUB_TOKEN}', 'Accept': 'application/vnd.github+json'},
+            json={'files': {POSITIONS_FILENAME: {'content': json.dumps(data)}}},
+            timeout=10
+        )
+        r.raise_for_status()
+        return True
+    except Exception as e:
+        print('Positions save failed:', e)
+        return False
+
 # ── DEFAULT WATCHLIST ────────────────────────────────────────────────────────
 DEFAULT_WATCHLIST = [
     "AAL","AAOI","AAPL","ADBE","AEHR","AGQ","AI","AIR","ALLY","ALT",
@@ -478,6 +515,69 @@ def watchlist_api():
         else:
             tickers=DEFAULT_WATCHLIST
     return jsonify({'tickers':tickers,'count':len(tickers)})
+
+@app.route('/api/positions', methods=['GET'])
+def positions_api():
+    return jsonify(load_positions_from_gist())
+
+@app.route('/api/positions/buy', methods=['POST'])
+def positions_buy():
+    data=request.json
+    sym=data.get('sym','').strip().upper()
+    price=float(data.get('price')); shares=float(data.get('shares'))
+    if not sym or price<=0 or shares<=0:
+        return jsonify({'error':'Invalid input'}),400
+    pos=load_positions_from_gist()
+    today=date.today().strftime("%Y-%m-%d")
+    entry=pos['active'].get(sym)
+    buy_record={'date':today,'price':round(price,4),'shares':round(shares,6),'amount':round(price*shares,2)}
+    if entry:
+        old_shares=entry['shares']; old_avg=entry['avg_price']
+        new_shares=old_shares+shares
+        new_avg=((old_shares*old_avg)+(shares*price))/new_shares
+        entry['shares']=round(new_shares,6); entry['avg_price']=round(new_avg,4)
+        entry['buys'].append(buy_record)
+    else:
+        entry={'shares':round(shares,6),'avg_price':round(price,4),'realized_pl':0.0,
+               'buys':[buy_record],'sells':[]}
+        pos['active'][sym]=entry
+    synced=save_positions_to_gist(pos)
+    return jsonify({'saved':True,'synced':synced,'position':entry})
+
+@app.route('/api/positions/sell', methods=['POST'])
+def positions_sell():
+    data=request.json
+    sym=data.get('sym','').strip().upper()
+    price=float(data.get('price')); shares=float(data.get('shares'))
+    if not sym or price<=0 or shares<=0:
+        return jsonify({'error':'Invalid input'}),400
+    pos=load_positions_from_gist()
+    entry=pos['active'].get(sym)
+    if not entry:
+        return jsonify({'error':f'No open position in {sym}'}),400
+    shares=min(shares,entry['shares'])  # can't sell more than owned
+    today=date.today().strftime("%Y-%m-%d")
+    realized=(price-entry['avg_price'])*shares
+    sell_record={'date':today,'price':round(price,4),'shares':round(shares,6),
+                 'amount':round(price*shares,2),'realized_pl':round(realized,2)}
+    entry['sells'].append(sell_record)
+    entry['realized_pl']=round(entry.get('realized_pl',0.0)+realized,2)
+    entry['shares']=round(entry['shares']-shares,6)
+    closed_entry=None
+    if entry['shares']<=0.0001:
+        total_bought=sum(b['shares'] for b in entry['buys'])
+        total_invested=round(total_bought*entry['avg_price'],2)
+        total_proceeds=round(sum(s['amount'] for s in entry['sells']),2)
+        closed_entry={'ticker':sym,'closed_date':today,'total_shares':round(total_bought,6),
+                      'avg_buy_price':entry['avg_price'],'total_invested':total_invested,
+                      'total_proceeds':total_proceeds,
+                      'realized_pl':round(total_proceeds-total_invested,2),
+                      'buys':entry['buys'],'sells':entry['sells']}
+        pos['closed'].append(closed_entry)
+        del pos['active'][sym]
+    synced=save_positions_to_gist(pos)
+    return jsonify({'saved':True,'synced':synced,'closed':closed_entry is not None,
+                    'position':closed_entry if closed_entry else entry})
 
 # ── OPTION CHAIN ROUTES ───────────────────────────────────────────────────────
 @app.route('/api/options/start/<sym>', methods=['POST'])
