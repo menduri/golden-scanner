@@ -544,6 +544,59 @@ def positions_buy():
     synced=save_positions_to_gist(pos)
     return jsonify({'saved':True,'synced':synced,'position':entry})
 
+@app.route('/api/positions/delete_sell', methods=['POST'])
+def positions_delete_sell():
+    data=request.json
+    sym=data.get('sym','').strip().upper()
+    sell_index=data.get('sell_index')
+    closed_index=data.get('closed_index')  # present only when deleting from a closed position
+    pos=load_positions_from_gist()
+
+    if closed_index is None:
+        entry=pos['active'].get(sym)
+        if not entry or sell_index is None or sell_index>=len(entry['sells']):
+            return jsonify({'error':'Sell not found'}),400
+        removed=entry['sells'].pop(sell_index)
+        entry['shares']=round(entry['shares']+removed['shares'],6)
+        entry['realized_pl']=round(entry.get('realized_pl',0.0)-removed['realized_pl'],2)
+        synced=save_positions_to_gist(pos)
+        return jsonify({'saved':True,'synced':synced,'reopened':False})
+
+    closed_index=int(closed_index)
+    if closed_index<0 or closed_index>=len(pos['closed']):
+        return jsonify({'error':'Closed position not found'}),400
+    c=pos['closed'][closed_index]
+    if sell_index is None or sell_index>=len(c['sells']):
+        return jsonify({'error':'Sell not found'}),400
+    removed=c['sells'].pop(sell_index)
+    remaining_sold=sum(s['shares'] for s in c['sells'])
+    remaining_shares=round(c['total_shares']-remaining_sold,6)
+
+    if remaining_shares<=0.0001:
+        # Still fully closed even without that sell — recompute totals
+        c['total_proceeds']=round(sum(s['amount'] for s in c['sells']),2)
+        c['realized_pl']=round(c['total_proceeds']-c['total_invested'],2)
+        synced=save_positions_to_gist(pos)
+        return jsonify({'saved':True,'synced':synced,'reopened':False})
+
+    # Deleting that sell leaves shares open again — reopen as an active position
+    pos['closed'].pop(closed_index)
+    realized_remaining=round(sum(s['realized_pl'] for s in c['sells']),2)
+    existing=pos['active'].get(sym)
+    if existing:
+        old_shares=existing['shares']; old_avg=existing['avg_price']
+        new_shares=round(old_shares+remaining_shares,6)
+        new_avg=((old_shares*old_avg)+(remaining_shares*c['avg_buy_price']))/new_shares if new_shares>0 else c['avg_buy_price']
+        existing['shares']=new_shares; existing['avg_price']=round(new_avg,4)
+        existing['buys']=existing['buys']+c['buys']
+        existing['sells']=existing['sells']+c['sells']
+        existing['realized_pl']=round(existing.get('realized_pl',0.0)+realized_remaining,2)
+    else:
+        pos['active'][sym]={'shares':remaining_shares,'avg_price':c['avg_buy_price'],
+                             'realized_pl':realized_remaining,'buys':c['buys'],'sells':c['sells']}
+    synced=save_positions_to_gist(pos)
+    return jsonify({'saved':True,'synced':synced,'reopened':True})
+
 @app.route('/api/positions/sell', methods=['POST'])
 def positions_sell():
     data=request.json
