@@ -208,18 +208,21 @@ def _fetch_ticker_raw(sym):
 def fetch_ticker(sym):
     # Hard outer timeout — yfinance's own timeout doesn't always reliably fire,
     # so a stuck ticker must never be able to block the whole scan indefinitely.
-    ex=concurrent.futures.ThreadPoolExecutor(max_workers=1)
-    future=ex.submit(_fetch_ticker_raw,sym)
+    # Everything is inside the try, including executor setup itself, so no
+    # failure mode here can ever kill the calling scan thread.
     try:
-        return future.result(timeout=15)
+        ex=concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        try:
+            future=ex.submit(_fetch_ticker_raw,sym)
+            return future.result(timeout=15)
+        finally:
+            ex.shutdown(wait=False)
     except concurrent.futures.TimeoutError:
         print(f'{sym}: fetch timed out after 15s, skipping')
         return None
     except Exception as e:
         print(f'{sym}: fetch failed: {e}')
         return None
-    finally:
-        ex.shutdown(wait=False)
 
 def classify_ticker(sym,daily,weekly,anchors):
     try:
@@ -356,18 +359,32 @@ def run_scan_thread(watchlist,board='main'):
     s.update({'running':True,'done':False,'results':[],'errors':[],
               'total':len(watchlist),'progress':0,
               'date':date.today().strftime("%B %d, %Y")})
-    anchors=load_anchors_from_gist()
-    anchors_before=json.dumps(anchors,sort_keys=True)
-    for i,sym in enumerate(watchlist):
-        s['current']=sym; s['progress']=i+1
-        data=fetch_ticker(sym)
-        if data is None: s['errors'].append(sym); continue
-        result=classify_ticker(sym,data[0],data[1],anchors)
-        if result: s['results'].append(result)
-        else: s['errors'].append(sym)
-    if json.dumps(anchors,sort_keys=True)!=anchors_before:
-        save_anchors_to_gist(anchors)
-    s['running']=False; s['done']=True
+    try:
+        anchors=load_anchors_from_gist()
+        anchors_before=json.dumps(anchors,sort_keys=True)
+        for i,sym in enumerate(watchlist):
+            s['current']=sym; s['progress']=i+1
+            try:
+                data=fetch_ticker(sym)
+                if data is None: s['errors'].append(sym); continue
+                result=classify_ticker(sym,data[0],data[1],anchors)
+                if result: s['results'].append(result)
+                else: s['errors'].append(sym)
+            except Exception as e:
+                print(f'{sym}: unexpected error during scan, skipping: {e}')
+                s['errors'].append(sym)
+        try:
+            if json.dumps(anchors,sort_keys=True)!=anchors_before:
+                save_anchors_to_gist(anchors)
+        except Exception as e:
+            print('Anchor save step failed:', e)
+    except Exception as e:
+        print('Scan thread failed unexpectedly:', e)
+    finally:
+        # No matter what happened above, the scan must always be marked done —
+        # otherwise the UI is stuck showing "scanning..." forever with no way
+        # to recover except a full server restart.
+        s['running']=False; s['done']=True
 
 # ── OPTION CHAIN STATE ────────────────────────────────────────────────────────
 option_jobs = {}  # sym -> {state, result, progress}
