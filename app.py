@@ -22,9 +22,21 @@ app = Flask(__name__)
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
 GITHUB_GIST_ID = os.environ.get('GITHUB_GIST_ID', '')
 GIST_FILENAME = 'golden_scanner_watchlist.json'
+GIST_FILENAME_LEVERAGED = 'golden_scanner_watchlist_leveraged.json'
 ANCHOR_FILENAME = 'golden_scanner_anchors.json'
 
-def load_watchlist_from_gist():
+# Single-stock leveraged ETFs (long + short/inverse), from the directory Menduri provided
+DEFAULT_WATCHLIST_LEVERAGED = [
+    "NVDL","NVDU","NVDD","NVDQ","TSLL","TSLR","TSLS","TSDD","AAPU","AAPX","AAPD",
+    "AMZU","AMZZ","AMZD","MSFU","MSFL","MSFD","GOOU","GOU","GOOD","METU","FBL","METD",
+    "AMDL","AMUU","AMDD","AVGU","AVGD","TSMU","TSMD","SMCX","SMCL","SMCZ","INTW","INTZ",
+    "MULL","MUDD","QCML","QCMD","MSTU","MSTX","MSTP","MSTZ","SMST","CONL","CONI","CONDD",
+    "PTIR","PLTU","PLTD","ASTX","ASTZ","MRAL","MRAD","APPX","APPZ","RDTL","RDTZ",
+    "CRWL","CRWZ","NOWL","NOWZ","OCNL","OCNZ","NFLU","NFLD","BABX","BABZ","PDDL","PDDZ",
+    "ROBN","ROBZ","AFRU","AFRZ","RVNL","RVNZ",
+]
+
+def load_watchlist_from_gist(filename=GIST_FILENAME):
     try:
         r = requests.get(
             f'https://api.github.com/gists/{GITHUB_GIST_ID}',
@@ -32,19 +44,22 @@ def load_watchlist_from_gist():
             timeout=10
         )
         r.raise_for_status()
-        content = r.json()['files'][GIST_FILENAME]['content']
+        files = r.json().get('files', {})
+        if filename not in files:
+            return None
+        content = files[filename]['content']
         tickers = json.loads(content)
         return tickers if isinstance(tickers, list) else None
     except Exception as e:
         print('Gist load failed:', e)
         return None
 
-def save_watchlist_to_gist(tickers):
+def save_watchlist_to_gist(tickers, filename=GIST_FILENAME):
     try:
         r = requests.patch(
             f'https://api.github.com/gists/{GITHUB_GIST_ID}',
             headers={'Authorization': f'token {GITHUB_TOKEN}', 'Accept': 'application/vnd.github+json'},
-            json={'files': {GIST_FILENAME: {'content': json.dumps(tickers)}}},
+            json={'files': {filename: {'content': json.dumps(tickers)}}},
             timeout=10
         )
         r.raise_for_status()
@@ -314,26 +329,30 @@ def tsi_zone(v):
     return 'NEUTRAL'
 
 # ── SCAN STATE ────────────────────────────────────────────────────────────────
-scan_state = {'running':False,'progress':0,'total':0,'current':'',
-              'results':[],'errors':[],'done':False,'date':''}
+def _empty_scan_state():
+    return {'running':False,'progress':0,'total':0,'current':'',
+            'results':[],'errors':[],'done':False,'date':''}
 
-def run_scan_thread(watchlist):
+scan_state = {'main': _empty_scan_state(), 'leveraged': _empty_scan_state()}
+
+def run_scan_thread(watchlist,board='main'):
     global scan_state
-    scan_state.update({'running':True,'done':False,'results':[],'errors':[],
-                       'total':len(watchlist),'progress':0,
-                       'date':date.today().strftime("%B %d, %Y")})
+    s=scan_state[board]
+    s.update({'running':True,'done':False,'results':[],'errors':[],
+              'total':len(watchlist),'progress':0,
+              'date':date.today().strftime("%B %d, %Y")})
     anchors=load_anchors_from_gist()
     anchors_before=json.dumps(anchors,sort_keys=True)
     for i,sym in enumerate(watchlist):
-        scan_state['current']=sym; scan_state['progress']=i+1
+        s['current']=sym; s['progress']=i+1
         data=fetch_ticker(sym)
-        if data is None: scan_state['errors'].append(sym); continue
+        if data is None: s['errors'].append(sym); continue
         result=classify_ticker(sym,data[0],data[1],anchors)
-        if result: scan_state['results'].append(result)
-        else: scan_state['errors'].append(sym)
+        if result: s['results'].append(result)
+        else: s['errors'].append(sym)
     if json.dumps(anchors,sort_keys=True)!=anchors_before:
         save_anchors_to_gist(anchors)
-    scan_state['running']=False; scan_state['done']=True
+    s['running']=False; s['done']=True
 
 # ── OPTION CHAIN STATE ────────────────────────────────────────────────────────
 option_jobs = {}  # sym -> {state, result, progress}
@@ -462,17 +481,22 @@ def index():
 @app.route('/api/scan', methods=['POST'])
 def start_scan():
     global scan_state
-    if scan_state['running']: return jsonify({'error':'Scan already running'}),400
     data=request.json
-    watchlist=data.get('watchlist',DEFAULT_WATCHLIST)
+    board=data.get('board','main')
+    if board not in scan_state: board='main'
+    if scan_state[board]['running']: return jsonify({'error':'Scan already running'}),400
+    default=DEFAULT_WATCHLIST if board=='main' else DEFAULT_WATCHLIST_LEVERAGED
+    watchlist=data.get('watchlist',default)
     watchlist=[t.strip().upper() for t in watchlist if t.strip()]
-    t=threading.Thread(target=run_scan_thread,args=(watchlist,))
+    t=threading.Thread(target=run_scan_thread,args=(watchlist,board))
     t.daemon=True; t.start()
     return jsonify({'status':'started','total':len(watchlist)})
 
 @app.route('/api/progress')
 def get_progress():
-    s=scan_state
+    board=request.args.get('board','main')
+    if board not in scan_state: board='main'
+    s=scan_state[board]
     counts={'gold':0,'stage-1-green':0,'stage-1-yellow':0,'stage-1-blue':0,
             'stage-2b':0,'stage-3':0,'stage-4':0,'stage-2':0}
     for r in s['results']: counts[r['sk']]=counts.get(r['sk'],0)+1
@@ -482,38 +506,52 @@ def get_progress():
 
 @app.route('/api/results')
 def get_results():
+    board=request.args.get('board','main')
+    if board not in scan_state: board='main'
+    s=scan_state[board]
     ORDER={'gold':0,'stage-1-green':1,'stage-1-yellow':2,'stage-1-blue':3,
            'stage-2b':4,'stage-3':5,'stage-4':6,'stage-2':7}
-    results=sorted(scan_state['results'],key=lambda r:(ORDER.get(r['sk'],9),r['sym']))
-    return jsonify({'results':results,'errors':scan_state['errors'],'date':scan_state['date']})
+    results=sorted(s['results'],key=lambda r:(ORDER.get(r['sk'],9),r['sym']))
+    return jsonify({'results':results,'errors':s['errors'],'date':s['date']})
 
 @app.route('/api/download')
 def download_excel():
-    if not scan_state['results']: return jsonify({'error':'No results yet'}),400
-    buf=build_excel(scan_state['results'],scan_state['date'])
-    filename=f"Golden_Scanner_{scan_state['date'].replace(' ','_').replace(',','')}.xlsx"
+    board=request.args.get('board','main')
+    if board not in scan_state: board='main'
+    s=scan_state[board]
+    if not s['results']: return jsonify({'error':'No results yet'}),400
+    buf=build_excel(s['results'],s['date'])
+    prefix='Golden_Scanner' if board=='main' else 'Golden_Scanner_Leveraged'
+    filename=f"{prefix}_{s['date'].replace(' ','_').replace(',','')}.xlsx"
     return send_file(buf,as_attachment=True,download_name=filename,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 @app.route('/api/watchlist', methods=['GET','POST'])
 def watchlist_api():
-    wl_file='watchlist.json'
+    if request.method=='POST':
+        board=(request.json or {}).get('board','main')
+    else:
+        board=request.args.get('board','main')
+    if board not in ('main','leveraged'): board='main'
+    gist_file=GIST_FILENAME if board=='main' else GIST_FILENAME_LEVERAGED
+    wl_file='watchlist.json' if board=='main' else 'watchlist_leveraged.json'
+    default=DEFAULT_WATCHLIST if board=='main' else DEFAULT_WATCHLIST_LEVERAGED
     if request.method=='POST':
         data=request.json
         tickers=[t.strip().upper() for t in data.get('tickers',[]) if t.strip()]
-        synced=save_watchlist_to_gist(tickers)
+        synced=save_watchlist_to_gist(tickers,gist_file)
         try:
             with open(wl_file,'w') as f: json.dump(tickers,f)
         except Exception:
             pass
         return jsonify({'saved':True,'count':len(tickers),'synced':synced})
     # GET — Gist is the source of truth so every device sees the same list
-    tickers=load_watchlist_from_gist()
+    tickers=load_watchlist_from_gist(gist_file)
     if tickers is None:
         if os.path.exists(wl_file):
             with open(wl_file) as f: tickers=json.load(f)
         else:
-            tickers=DEFAULT_WATCHLIST
+            tickers=default
     return jsonify({'tickers':tickers,'count':len(tickers)})
 
 @app.route('/api/lookup', methods=['GET'])
