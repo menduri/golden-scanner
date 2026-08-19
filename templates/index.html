@@ -602,9 +602,13 @@ function renderResults(filter){
   else{
     let lsk='';
     for(const r of data){
-      const sec=r.is_gold?'🥇 GOLD SETUPS — Daily + Weekly Stage 1 Aligned':SEC_NAMES[r.sk]||'';
-      if(sec!==lsk&&(filter==='all'||filter==='buy')){html+=`<div class="section-hdr">${sec}</div>`;lsk=sec}
-      html+=renderCard(r);
+      try{
+        const sec=r.is_gold?'🥇 GOLD SETUPS — Daily + Weekly Stage 1 Aligned':SEC_NAMES[r.sk]||'';
+        if(sec!==lsk&&(filter==='all'||filter==='buy')){html+=`<div class="section-hdr">${sec}</div>`;lsk=sec}
+        html+=renderCard(r);
+      }catch(e){
+        console.error('Card render failed for',r&&r.sym,e);
+      }
     }
   }
   html+='</div>';
@@ -653,20 +657,25 @@ async function pollProgress(){
   document.getElementById('stGray').textContent=data.counts['stage-2']||0;
   if(data.done){
     clearInterval(scanInterval);
-    const res2=await fetch(`/api/results?board=${currentBoard}`);const results=await res2.json();
-    allResults=results.results;boardCache[currentBoard]=results;renderResults(currentFilter);
-    const btn=document.getElementById('scanBtn');btn.disabled=false;btn.textContent='↺ RESCAN';
-    document.getElementById('downloadBar').style.display='flex';
-    document.getElementById('dlDate').textContent=results.date;
-    document.getElementById('dlCount').textContent=`${allResults.length} setups found`;
-    const errNotice=document.getElementById('errorNotice');
-    if(results.errors && results.errors.length>0){
-      document.getElementById('errorSummary').textContent=`⚠ ${results.errors.length} ticker(s) failed to load — tap to see which`;
-      document.getElementById('errorList').textContent=results.errors.join(', ');
-      errNotice.style.display='block';
-    } else {
-      errNotice.style.display='none';
+    try{
+      const res2=await fetch(`/api/results?board=${currentBoard}`);const results=await res2.json();
+      allResults=results.results;boardCache[currentBoard]=results;renderResults(currentFilter);
+      document.getElementById('downloadBar').style.display='flex';
+      document.getElementById('dlDate').textContent=results.date;
+      document.getElementById('dlCount').textContent=`${allResults.length} setups found`;
+      const errNotice=document.getElementById('errorNotice');
+      if(results.errors && results.errors.length>0){
+        document.getElementById('errorSummary').textContent=`⚠ ${results.errors.length} ticker(s) failed to load — tap to see which`;
+        document.getElementById('errorList').textContent=results.errors.join(', ');
+        errNotice.style.display='block';
+      } else {
+        errNotice.style.display='none';
+      }
+    }catch(e){
+      console.error('Render failed:',e);
+      document.getElementById('mainContent').innerHTML=`<div class="empty-state">Something went wrong displaying results (${e.message}). The scan itself finished fine — try tapping RESCAN, or switch tabs and back.</div>`;
     }
+    const btn=document.getElementById('scanBtn');btn.disabled=false;btn.textContent='↺ RESCAN';
   }
 }
 
