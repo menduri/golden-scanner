@@ -627,6 +627,7 @@ async function startScan(){
   document.getElementById('statsBar').style.display='flex';
   document.getElementById('filtersBar').style.display='flex';
   document.getElementById('downloadBar').style.display='none';
+  document.getElementById('errorNotice').style.display='none';
   allResults=[];
   const boardLabel=currentBoard==='leveraged'?'LEVERAGED ETF LIST':'YOUR WATCHLIST';
   document.getElementById('mainContent').innerHTML=`<div class="loading-screen"><div class="loading-title">SCANNING ${boardLabel}</div><div class="progress-track"><div class="progress-fill" id="pFill" style="width:0%"></div></div><div class="loading-sub">TSI 25/13/8 · 7 EMA · 21 EMA · 200 SMA<br>Daily + Weekly · Stage System</div><div class="loading-ticker" id="lTick">Connecting to Yahoo Finance...</div></div>`;
