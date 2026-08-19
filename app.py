@@ -3,6 +3,7 @@ import yfinance as yf
 import pandas as pd
 import json, os, io, threading
 import requests
+import concurrent.futures
 from datetime import date
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -196,15 +197,29 @@ def calc_tsi(closes, long=25, short=13, signal=8):
     tsi=(e2/ae2.replace(0,float('nan')))*100
     return tsi, ema(tsi,signal)
 
+def _fetch_ticker_raw(sym):
+    tk=yf.Ticker(sym)
+    daily=tk.history(period="2y",interval="1d",timeout=12)
+    if daily.empty or len(daily)<60: return None
+    weekly=tk.history(period="5y",interval="1wk",timeout=12)
+    if weekly.empty or len(weekly)<60: weekly=None
+    return daily,weekly
+
 def fetch_ticker(sym):
+    # Hard outer timeout — yfinance's own timeout doesn't always reliably fire,
+    # so a stuck ticker must never be able to block the whole scan indefinitely.
+    ex=concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    future=ex.submit(_fetch_ticker_raw,sym)
     try:
-        tk=yf.Ticker(sym)
-        daily=tk.history(period="2y",interval="1d")
-        if daily.empty or len(daily)<60: return None
-        weekly=tk.history(period="5y",interval="1wk")
-        if weekly.empty or len(weekly)<60: weekly=None
-        return daily,weekly
-    except: return None
+        return future.result(timeout=15)
+    except concurrent.futures.TimeoutError:
+        print(f'{sym}: fetch timed out after 15s, skipping')
+        return None
+    except Exception as e:
+        print(f'{sym}: fetch failed: {e}')
+        return None
+    finally:
+        ex.shutdown(wait=False)
 
 def classify_ticker(sym,daily,weekly,anchors):
     try:
