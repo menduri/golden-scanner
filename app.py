@@ -34,7 +34,7 @@ DEFAULT_WATCHLIST_LEVERAGED = [
     "MULL","MUDD","QCML","QCMD","MSTU","MSTX","MSTP","MSTZ","SMST","CONL","CONI","CONDD",
     "PTIR","PLTU","PLTD","ASTX","ASTZ","MRAL","MRAD","APPX","APPZ","RDTL","RDTZ",
     "CRWL","CRWZ","NOWL","NOWZ","OCNL","OCNZ","NFLU","NFLD","BABX","BABZ","PDDL","PDDZ",
-    "ROBN","ROBZ","AFRU","AFRZ","RVNL","RVNZ",
+    "ROBN","ROBZ","AFRU","AFRZ","RVNL",
 ]
 
 def load_watchlist_from_gist(filename=GIST_FILENAME):
@@ -385,6 +385,7 @@ def run_scan_thread(watchlist,board='main'):
         # otherwise the UI is stuck showing "scanning..." forever with no way
         # to recover except a full server restart.
         s['running']=False; s['done']=True
+        print(f'=== SCAN COMPLETE [{board}] — {len(s["results"])} results, {len(s["errors"])} errors ===')
 
 # ── OPTION CHAIN STATE ────────────────────────────────────────────────────────
 option_jobs = {}  # sym -> {state, result, progress}
