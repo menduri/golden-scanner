@@ -634,28 +634,6 @@ async function startScan(){
   const wlRes=await fetch(`/api/watchlist?board=${currentBoard}`);const wlData=await wlRes.json();currentWatchlist=wlData.tickers;
   await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({watchlist:currentWatchlist,board:currentBoard})});
   scanInterval=setInterval(pollProgress,1200);
-  const otherBoard=currentBoard==='main'?'leveraged':'main';
-  if(!boardCache[otherBoard] && !bgScanInFlight[otherBoard]) triggerBackgroundScan(otherBoard);
-}
-
-let bgScanInFlight={main:false,leveraged:false};
-async function triggerBackgroundScan(board){
-  bgScanInFlight[board]=true;
-  try{
-    const wlRes=await fetch(`/api/watchlist?board=${board}`);const wlData=await wlRes.json();
-    await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({watchlist:wlData.tickers,board})});
-  }catch(e){ /* if it's already running from elsewhere, keep polling below anyway */ }
-  const poll=setInterval(async()=>{
-    const res=await fetch(`/api/progress?board=${board}`);const data=await res.json();
-    if(data.done){
-      clearInterval(poll);
-      const res2=await fetch(`/api/results?board=${board}`);const results=await res2.json();
-      boardCache[board]=results;
-      bgScanInFlight[board]=false;
-      const label=board==='leveraged'?'Leveraged ETFs':'Stocks';
-      showToast(`${label} scan finished in the background — ready to view`);
-    }
-  },2000);
 }
 
 async function pollProgress(){
