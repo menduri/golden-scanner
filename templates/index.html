@@ -165,6 +165,11 @@ body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-ser
 .pl-pos{color:var(--green)}.pl-neg{color:var(--red)}
 .pos-del{color:var(--red);cursor:pointer;padding:0 4px;font-weight:700;opacity:0.7}
 .pos-del:hover{opacity:1}
+.search-bar{display:flex;gap:8px;padding:10px 18px;background:var(--surf);border-bottom:1px solid var(--border)}
+.search-input{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Space Mono',monospace;font-size:12px;padding:9px 12px;border-radius:8px;outline:none}
+.search-input:focus{border-color:var(--gold)}
+.search-btn{background:var(--gold);color:#000;border:none;padding:9px 16px;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;border-radius:8px;cursor:pointer;letter-spacing:1px}
+.search-btn:hover{background:var(--gold2)}
 /* OPTION MODAL */
 .opt-modal{max-width:820px;max-height:92vh}
 .opt-tabs{display:flex;gap:6px;border-bottom:1px solid var(--border);padding-bottom:12px}
@@ -246,6 +251,11 @@ canvas{max-height:300px}
     <button class="icon-btn" onclick="openPositions()">📁 POSITIONS</button>
     <button class="scan-btn" id="scanBtn" onclick="startScan()">▶ RUN SCAN</button>
   </div>
+</div>
+
+<div class="search-bar">
+  <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search any ticker (e.g. IBM) — even if it's not on your watchlist" onkeydown="if(event.key==='Enter')runSearch()">
+  <button class="search-btn" onclick="runSearch()">SEARCH</button>
 </div>
 
 <div class="stats-bar" id="statsBar" style="display:none">
@@ -374,6 +384,14 @@ canvas{max-height:300px}
     </div>
     <div id="posDetailBody" class="modal-scroll"></div>
     <div class="modal-footer" id="posDetailFooter"></div>
+  </div>
+</div>
+
+<!-- Search Result Modal -->
+<div class="modal-overlay" id="searchOverlay">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title">🔍 SEARCH RESULT<button class="modal-close" onclick="closeSearch()">✕</button></div>
+    <div id="searchResultBody"></div>
   </div>
 </div>
 
@@ -1240,6 +1258,26 @@ async function deleteClosedSell(closedIndex,sellIndex){
   if(data.reopened && positionsData.active[sym]){ setPosTab('active'); openPosDetail(sym); }
   else closePosDetail();
 }
+
+// ── SEARCH ──
+async function runSearch(){
+  const sym=document.getElementById('searchInput').value.trim().toUpperCase();
+  if(!sym){ showToast('Type a ticker first'); return; }
+  document.getElementById('searchResultBody').innerHTML='<div class="empty-state">Searching...</div>';
+  document.getElementById('searchOverlay').classList.add('open');
+  try{
+    const res=await fetch(`/api/lookup?sym=${encodeURIComponent(sym)}`);
+    const data=await res.json();
+    if(data.error){
+      document.getElementById('searchResultBody').innerHTML=`<div class="empty-state">${data.error}</div>`;
+      return;
+    }
+    document.getElementById('searchResultBody').innerHTML=`<div class="cards-grid" style="display:block">${renderCard(data.result)}</div>`;
+  }catch(e){
+    document.getElementById('searchResultBody').innerHTML='<div class="empty-state">Search failed — try again.</div>';
+  }
+}
+function closeSearch(){ document.getElementById('searchOverlay').classList.remove('open'); }
 
 // ── UTILS ──
 function showToast(msg){
