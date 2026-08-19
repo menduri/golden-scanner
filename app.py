@@ -329,9 +329,15 @@ def classify_ticker(sym,daily,weekly,anchors):
         if entry and tsi_val>=20:
             anchors.pop(sym,None)
 
+        # NaN is not valid JSON — a single NaN value here would crash parsing
+        # of the ENTIRE results batch in the browser, not just this ticker.
+        # Treat it as a failed/unclassifiable ticker instead of ever emitting it.
+        if math.isnan(tsi_val) or (wtsi_val is not None and math.isnan(wtsi_val)):
+            return None
+
         return {
             'sym':sym,'price':round(price,2),'tsi':round(tsi_val,2),
-            'tsi_dir':tsi_dir,'wtsi':round(wtsi_val,2) if wtsi_val else None,
+            'tsi_dir':tsi_dir,'wtsi':round(wtsi_val,2) if wtsi_val is not None and not math.isnan(wtsi_val) else None,
             'ab7':ab7,'ab21':ab21,'ab200':ab200,
             'sk':sk,'label':label,'signal':signal,'buy':buy,'is_gold':sk=='gold',
         }
