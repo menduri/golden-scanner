@@ -516,6 +516,20 @@ def watchlist_api():
             tickers=DEFAULT_WATCHLIST
     return jsonify({'tickers':tickers,'count':len(tickers)})
 
+@app.route('/api/lookup', methods=['GET'])
+def lookup_ticker():
+    sym=request.args.get('sym','').strip().upper()
+    if not sym:
+        return jsonify({'error':'No ticker provided'}),400
+    data=fetch_ticker(sym)
+    if data is None:
+        return jsonify({'error':f'{sym} not found or no data available'}),404
+    anchors=dict(load_anchors_from_gist())  # read-only copy — a lookup never writes anchor state
+    result=classify_ticker(sym,data[0],data[1],anchors)
+    if result is None:
+        return jsonify({'error':f'Not enough price history for {sym}'}),404
+    return jsonify({'result':result})
+
 @app.route('/api/positions', methods=['GET'])
 def positions_api():
     return jsonify(load_positions_from_gist())
