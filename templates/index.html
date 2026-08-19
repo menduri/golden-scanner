@@ -170,6 +170,9 @@ body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-ser
 .search-input:focus{border-color:var(--gold)}
 .search-btn{background:var(--gold);color:#000;border:none;padding:9px 16px;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;border-radius:8px;cursor:pointer;letter-spacing:1px}
 .search-btn:hover{background:var(--gold2)}
+.board-tabs{display:flex;gap:0;background:var(--surf);border-bottom:1px solid var(--border);padding:0 18px}
+.board-tab{flex:1;max-width:220px;padding:11px 16px;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;border:none;background:transparent;color:var(--muted2);letter-spacing:0.5px;cursor:pointer;border-bottom:2px solid transparent}
+.board-tab.active{color:var(--gold);border-bottom-color:var(--gold)}
 /* OPTION MODAL */
 .opt-modal{max-width:820px;max-height:92vh}
 .opt-tabs{display:flex;gap:6px;border-bottom:1px solid var(--border);padding-bottom:12px}
@@ -258,6 +261,11 @@ canvas{max-height:300px}
   <button class="search-btn" onclick="runSearch()">SEARCH</button>
 </div>
 
+<div class="board-tabs">
+  <button class="board-tab active" id="boardTabMain" onclick="switchBoard('main')">📊 STOCKS</button>
+  <button class="board-tab" id="boardTabLeveraged" onclick="switchBoard('leveraged')">⚡ LEVERAGED ETFs</button>
+</div>
+
 <div class="stats-bar" id="statsBar" style="display:none">
   <div class="stat-chip"><div class="stat-chip-label">Scanned</div><div class="stat-chip-val sv-muted" id="stTotal">0</div></div>
   <div class="stat-chip"><div class="stat-chip-label">🥇 Gold</div><div class="stat-chip-val sv-gold" id="stGold">0</div></div>
@@ -310,7 +318,7 @@ canvas{max-height:300px}
 <!-- Watchlist Modal -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
-    <div class="modal-title">⊕ MANAGE WATCHLIST<button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-title"><span id="modalTitleText">⊕ MANAGE WATCHLIST</span><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-sub">One ticker per line or comma separated. Changes saved automatically.</div>
     <textarea class="modal-textarea" id="watchlistInput" oninput="updateCount()"></textarea>
     <div class="modal-footer">
@@ -519,6 +527,8 @@ canvas{max-height:300px}
 
 <script>
 let allResults=[], currentFilter='all', scanInterval=null, currentWatchlist=[];
+let currentBoard='main';
+let boardCache={main:null,leveraged:null}; // caches last-known results per board so switching tabs doesn't lose data
 let selectMode=false, selectedSyms=new Set();
 let optChart=null, currentOptSym=null, optPollInterval=null;
 let netChartData=[];
@@ -611,14 +621,15 @@ async function startScan(){
   document.getElementById('filtersBar').style.display='flex';
   document.getElementById('downloadBar').style.display='none';
   allResults=[];
-  document.getElementById('mainContent').innerHTML=`<div class="loading-screen"><div class="loading-title">SCANNING YOUR WATCHLIST</div><div class="progress-track"><div class="progress-fill" id="pFill" style="width:0%"></div></div><div class="loading-sub">TSI 25/13/8 · 7 EMA · 21 EMA · 200 SMA<br>Daily + Weekly · Stage System</div><div class="loading-ticker" id="lTick">Connecting to Yahoo Finance...</div></div>`;
-  const wlRes=await fetch('/api/watchlist');const wlData=await wlRes.json();currentWatchlist=wlData.tickers;
-  await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({watchlist:currentWatchlist})});
+  const boardLabel=currentBoard==='leveraged'?'LEVERAGED ETF LIST':'YOUR WATCHLIST';
+  document.getElementById('mainContent').innerHTML=`<div class="loading-screen"><div class="loading-title">SCANNING ${boardLabel}</div><div class="progress-track"><div class="progress-fill" id="pFill" style="width:0%"></div></div><div class="loading-sub">TSI 25/13/8 · 7 EMA · 21 EMA · 200 SMA<br>Daily + Weekly · Stage System</div><div class="loading-ticker" id="lTick">Connecting to Yahoo Finance...</div></div>`;
+  const wlRes=await fetch(`/api/watchlist?board=${currentBoard}`);const wlData=await wlRes.json();currentWatchlist=wlData.tickers;
+  await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({watchlist:currentWatchlist,board:currentBoard})});
   scanInterval=setInterval(pollProgress,1200);
 }
 
 async function pollProgress(){
-  const res=await fetch('/api/progress');const data=await res.json();
+  const res=await fetch(`/api/progress?board=${currentBoard}`);const data=await res.json();
   const pct=data.total>0?(data.progress/data.total*100):0;
   const fill=document.getElementById('pFill');const tick=document.getElementById('lTick');
   if(fill)fill.style.width=pct+'%';
@@ -634,8 +645,8 @@ async function pollProgress(){
   document.getElementById('stGray').textContent=data.counts['stage-2']||0;
   if(data.done){
     clearInterval(scanInterval);
-    const res2=await fetch('/api/results');const results=await res2.json();
-    allResults=results.results;renderResults(currentFilter);
+    const res2=await fetch(`/api/results?board=${currentBoard}`);const results=await res2.json();
+    allResults=results.results;boardCache[currentBoard]=results;renderResults(currentFilter);
     const btn=document.getElementById('scanBtn');btn.disabled=false;btn.textContent='↺ RESCAN';
     document.getElementById('downloadBar').style.display='flex';
     document.getElementById('dlDate').textContent=results.date;
@@ -651,7 +662,44 @@ async function pollProgress(){
   }
 }
 
-function downloadExcel(){window.location.href='/api/download'}
+function downloadExcel(){window.location.href=`/api/download?board=${currentBoard}`}
+
+// ── BOARDS (Stocks vs Leveraged ETFs) ──
+async function switchBoard(board){
+  if(board===currentBoard) return;
+  currentBoard=board;
+  document.getElementById('boardTabMain').classList.toggle('active',board==='main');
+  document.getElementById('boardTabLeveraged').classList.toggle('active',board==='leveraged');
+  document.getElementById('scanBtn').disabled=false;
+  document.getElementById('scanBtn').textContent='▶ RUN SCAN';
+  const cached=boardCache[board];
+  if(cached){
+    allResults=cached.results;
+    document.getElementById('statsBar').style.display='flex';
+    document.getElementById('filtersBar').style.display='flex';
+    document.getElementById('downloadBar').style.display='flex';
+    document.getElementById('dlDate').textContent=cached.date;
+    document.getElementById('dlCount').textContent=`${allResults.length} setups found`;
+    renderResults(currentFilter);
+    const res=await fetch(`/api/progress?board=${board}`);const data=await res.json();
+    document.getElementById('stTotal').textContent=data.scanned;
+    document.getElementById('stGold').textContent=data.counts.gold||0;
+    document.getElementById('stGreen').textContent=data.counts['stage-1-green']||0;
+    document.getElementById('stYellow').textContent=data.counts['stage-1-yellow']||0;
+    document.getElementById('stBlue').textContent=data.counts['stage-1-blue']||0;
+    document.getElementById('stPurple').textContent=data.counts['stage-2b']||0;
+    document.getElementById('stOrange').textContent=data.counts['stage-3']||0;
+    document.getElementById('stRed').textContent=data.counts['stage-4']||0;
+    document.getElementById('stGray').textContent=data.counts['stage-2']||0;
+  } else {
+    allResults=[];
+    document.getElementById('statsBar').style.display='none';
+    document.getElementById('filtersBar').style.display='none';
+    document.getElementById('downloadBar').style.display='none';
+    const label=board==='leveraged'?'leveraged ETF list':'watchlist';
+    document.getElementById('mainContent').innerHTML=`<div class="empty-state">Tap ▶ RUN SCAN to scan your ${label}.</div>`;
+  }
+}
 
 // ── SELECT MODE ──
 function toggleSelectMode(){
@@ -1029,8 +1077,9 @@ async function exportChain(sym,btn){
 
 // ── WATCHLIST ──
 async function openModal(){
-  const res=await fetch('/api/watchlist');const data=await res.json();
+  const res=await fetch(`/api/watchlist?board=${currentBoard}`);const data=await res.json();
   document.getElementById('watchlistInput').value=data.tickers.join('\n');
+  document.getElementById('modalTitleText').textContent=currentBoard==='leveraged'?'⊕ MANAGE LEVERAGED ETF LIST':'⊕ MANAGE WATCHLIST';
   updateCount();document.getElementById('modalOverlay').classList.add('open');
 }
 function closeModal(){document.getElementById('modalOverlay').classList.remove('open')}
@@ -1040,10 +1089,11 @@ function updateCount(){
 }
 async function saveWatchlist(){
   const t=document.getElementById('watchlistInput').value.split(/[\n,]+/).map(s=>s.trim().toUpperCase()).filter(Boolean);
-  const res=await fetch('/api/watchlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tickers:t})});
+  const res=await fetch('/api/watchlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tickers:t,board:currentBoard})});
   const data=await res.json();
   if(data.synced){ showToast('Watchlist saved — synced everywhere!'); }
   else { showToast('Saved locally, but sync failed — check GitHub token'); }
+  boardCache[currentBoard]=null; // force a fresh scan to pick up the new list
   setTimeout(closeModal,1200);
 }
 
